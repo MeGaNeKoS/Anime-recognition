@@ -21,26 +21,6 @@ last_day_check = None
 redirect = None
 
 
-def init():
-    # only run if the logger is not initialized
-    if CONFIG.get("logger", None) is not None:
-        return
-
-    logger = logging.getLogger(__package__)
-    logger.setLevel(logging.INFO)
-
-    formatter = logging.Formatter('%(levelname)s:%(name)s:%(message)s')
-    file_handler = logging.FileHandler('app.log', encoding="utf-8")
-    file_handler.setFormatter(formatter)
-    file_handler.setLevel(logging.DEBUG)
-
-    CONFIG["logger"] = logger
-    CONFIG["log_handler"] = [file_handler]
-
-    for handler in CONFIG["log_handler"]:
-        logger.addHandler(handler)
-
-
 def load_update():
     global last_check, redirect
     # get the GitHub commit link
@@ -289,5 +269,4 @@ def parsing(filename):
     return anime
 
 
-init()
 load_update()

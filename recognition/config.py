@@ -1,3 +1,6 @@
+import logging
+
+
 CONFIG = {
     "relation_file_path": "./data/anime-relations/anime-relations.txt",
     "source_api": "anilist",  # mal, kitsu, anilist
@@ -11,6 +14,22 @@ CONFIG = {
                   'mov', 'mp2', 'mp4', 'mpe', 'mpeg', 'mpg', 'mpv', 'mxf', 'nsv', 'ogg', 'ogv', 'qt', 'rm', 'rmvb',
                   'roq', 'svi', 'vob', 'webm', 'wmv', 'yuv'],
 }
+
+logger = logging.getLogger(__package__)  # set package logger configuration
+logger.setLevel(logging.INFO)
+
+formatter = logging.Formatter('%(levelname)s:%(name)s:%(message)s')
+file_handler = logging.FileHandler('app.log', encoding="utf-8")
+file_handler.setFormatter(formatter)
+file_handler.setLevel(logging.INFO)
+logger.addHandler(file_handler)
+
+CONFIG["logger"] = logger
+CONFIG["log_handler"] = [file_handler]
+
+for handler in CONFIG["log_handler"]:
+    logger.addHandler(handler)
+
 
 # def set_config(**kwargs):
 #     edit_log_handler = False

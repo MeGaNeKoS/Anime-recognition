@@ -1,7 +1,7 @@
 import re
 import logging
 
-logger = logging.getLogger(__package__)
+logger = logging.getLogger(__name__)  # inherits package logger configuration
 SUPPORTED_APIS = ['mal', 'kitsu', 'anilist']
 
 
