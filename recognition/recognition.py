@@ -258,7 +258,7 @@ def track(anime_filepath, is_folder=False):
             # attempt to parse from the folder name
             # look up to 2 level above
             for path in paths[:-3:-1]:
-                guess_title = parsing(path)
+                guess_title = parsing(path, is_folder)
                 if guess_title.get("anime_title", "None").lower() in CONFIG["folder_blacklist"]:
                     continue
                 guess["anime_title"] = guess_title["anime_title"]
