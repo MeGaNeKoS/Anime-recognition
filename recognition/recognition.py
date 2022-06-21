@@ -240,9 +240,10 @@ def track(anime_filepath, is_folder=False):
         except KeyError:
             pass
 
-    if str(anime["anime_type"]).lower() not in CONFIG["ignored_type"] and \
-            float(anime.get("episode_number", 0)).is_integer() and \
-            anime.get('file_extension', '') in CONFIG["valid_ext"]:
+    if (str(anime["anime_type"]).lower() not in CONFIG["ignored_type"] and
+            float(anime.get("episode_number", 0)).is_integer() and
+            anime.get('file_extension', '') in CONFIG["valid_ext"] or
+            is_folder):
         # this anime is not in ignored type and not episode with comma (recap eps)
 
         # if the anime title in the custom db, return it mal, kitsu, anilist id instead.
