@@ -187,7 +187,7 @@ def anime_check(anime: dict):
 
 
 @devlog.log_on_error(trace_stack=True)
-def track(anime_filepath):
+def track(anime_filepath, is_folder=False):
     # check update the anime relation file.
     # only executed once per day
     global instance, redirect, last_day_check
@@ -200,11 +200,19 @@ def track(anime_filepath):
 
     # the last element is the anime filename
     anime_filename = paths[-1]
-    anime = parsing(anime_filename)
+    anime = parsing(anime_filename, is_folder)
 
     # ignore if the anime are recap episode, usually with float number
-    if not float(anime.get("episode_number", 0)).is_integer():
-        return anime
+    try:
+        if not float(anime.get("episode_number", 0)).is_integer():
+            return anime
+    except TypeError:
+        if not is_folder:
+            return anime
+        # multiple episodes detected, probably from concat episode, or batch eps
+        # we will ignore the episode
+        CONFIG["logger"].info(f"{anime_filename} has multiple episodes or batch release")
+        anime["episode_number"] = -1
 
     # check if we detect multiple anime season
     if isinstance(anime.get('anime_season'), list):
@@ -261,11 +269,12 @@ def track(anime_filepath):
     return anime
 
 
-def parsing(filename):
+def parsing(filename, is_folder):
     anime = anitopy.parse(filename)
     # by default, all anime will treat as unknown type
     anime['anime_type'] = 'torrent'
     anime["anilist"] = 0
+    anime["isFolder"] = is_folder
     return anime
 
 
