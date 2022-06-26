@@ -156,10 +156,13 @@ def anime_check(anime: dict):
     # remove all unnecessary double spaces
     f_search = re.sub(r'\s+', ' ', f_search).rstrip()
 
-    results = search_anime_info_anilist(f_search, per_page=100)['data']['Page']['media']
+    # separate the variable for stack trace
+    data = search_anime_info_anilist(f_search, per_page=100)
+    results = data['data']['Page']['media']
 
     if not results:
-        results = search_anime_info_anilist(search, per_page=100)['data']['Page']['media']
+        data = search_anime_info_anilist(search, per_page=100)
+        results = data['data']['Page']['media']
 
     # try to guess the season
     fail, result = result_parser(anime, season, search, results)
