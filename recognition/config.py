@@ -22,7 +22,6 @@ formatter = logging.Formatter('%(levelname)s:%(name)s:%(message)s')
 file_handler = logging.FileHandler('app.log', encoding="utf-8")
 file_handler.setFormatter(formatter)
 file_handler.setLevel(logging.INFO)
-logger.addHandler(file_handler)
 
 CONFIG["logger"] = logger
 CONFIG["log_handler"] = [file_handler]
