@@ -16,7 +16,7 @@ CONFIG = {
 }
 
 logger = logging.getLogger(__package__)  # set package logger configuration
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.ERROR)
 
 formatter = logging.Formatter('%(levelname)s:%(name)s:%(message)s')
 file_handler = logging.FileHandler('app.log', encoding="utf-8")
