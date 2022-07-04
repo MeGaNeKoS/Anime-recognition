@@ -274,6 +274,7 @@ def track(anime_filepath, is_folder=False):
 
 
 def parsing(filename, is_folder):
+    filename = re.sub(r'(\d+)v([2-9])', r'\1 v\2 ', filename)
     anime = anitopy.parse(filename)
     # by default, all anime will treat as unknown type
     anime['anime_type'] = 'torrent'
