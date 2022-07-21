@@ -1,0 +1,3 @@
+[submodule "data/Anime-Fansub-Relation"]
+	path = data/Anime-Fansub-Relation
+	url = https://github.com/MeGaNeKoS/Anime-Fansub-Relation.git

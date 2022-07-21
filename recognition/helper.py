@@ -1,8 +1,50 @@
-import re
+import json
 import logging
+import re
 
 logger = logging.getLogger(__name__)  # inherits package logger configuration
 SUPPORTED_APIS = ['mal', 'kitsu', 'anilist']
+
+
+def anime_season_relation(anime):
+    with open('./data/Anime-Fansub-Relation/anime-fansub-relation.json', "r+", encoding="utf-8") as input_json:
+        anime_fansub_relation = json.load(input_json)
+
+    anime_relation = anime_fansub_relation.get(anime['anime_title'], None)
+    anime_id = None
+    anime_season = anime.get("anime_season", None)
+
+    # we found in database
+    if anime_relation:
+        # if we have the anime season in the anime relation
+        # the anime season should be a string of a number without leading zero and can't be negative
+        logger.info("Found in the anime in database")
+        if anime_season:
+            anime_relation = anime_relation.get(str(int(anime_season)), None)
+
+        # optional
+        if anime.get("anime_type", "torrent") != "torrent":
+            logger.info("Found in the anime using the anime type")
+            anime_relation = anime_relation.get(anime.get("anime_type", "").lower(), anime_relation)
+
+        if anime.get("anime_year", 0):
+            logger.info("Found in the anime using the anime type")
+            anime_relation = anime_relation.get(anime.get("anime_year", "").lower(), anime_relation)
+
+        # this can be change on code above, if we have the anime season in the anime relation
+        # if we don't have the anime season in the anime relation, then we want to ask the user to enter the anime id
+        if anime_relation:
+            # if the anime fansub in the anime relation
+            anime_id = anime_relation.get(anime.get('release_group').lower(), None)
+            # else we return the default value
+            if anime_id is None:
+                anime_id = anime_relation.get("anilist", None)
+                logger.info(f"Anime id are {anime_id}")
+            else:
+                logger.info(f"Anime with fansub from {anime.get('release_group')} are {anime_id}")
+        else:
+            logger.info(f"No Season {int(anime_season)} in database")
+    return anime_id
 
 
 def parse_anime_relations(filename, api='anilist'):

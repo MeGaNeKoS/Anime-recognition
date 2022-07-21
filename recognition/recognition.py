@@ -2,6 +2,7 @@ import functools
 import os
 import re
 from datetime import date
+from difflib import SequenceMatcher
 
 import anitopy
 import devlog
@@ -50,123 +51,144 @@ def get_anime_info_anilist(anime_id):
     return result["data"]["Media"]
 
 
-def result_parser(anime, season, search, results):
-    # attempt to guess the correct anime
-    # if the anime description says x season of, after season x, of the x season,
-    season_year = 0  # use on guessing by anime publish order
-    candidate = None
-
-    for result in results:
-        if anime.get("anime_year", False):
-            if str(result.get("seasonYear")) != anime.get("anime_year", False):
-                continue
-        # attempt to retrieve from the description
-        # if the description is none, then skip it
-        if result["description"] is not None:
-            if f"{num2words(season, to='ordinal')} season" in result["description"].lower():
-                # https://anilist.co/anime/114233/Gundam-Build-Divers-ReRISE-2nd-Season/
-                # https://anilist.co/anime/20723/Yowamushi-Pedal-GRANDE-ROAD
-                return False, result
-            elif f"after the {num2words(season - 1, to='ordinal')} season" in result["description"].lower():
-                # https://anilist.co/anime/14693/Yurumates-3D-Plus
-                return False, result
-            elif f"after season {num2words(season - 1, to='cardinal')}" in result["description"].lower():
-                # https://anilist.co/anime/558/Major-S2
-                return False, result
-            elif f"of the {num2words(season - 1, to='ordinal')} season" in result["description"].lower():
-                # https://anilist.co/anime/21856/Boku-no-Hero-Academia-2/
-                return False, result
-
-        # attempt to retrieve from the title
-        for title in list(result["title"].values()):
-            # remove non-alphanumeric characters
-            if title is None:
-                continue
-            title = re.sub(r"([^\w+])+", ' ', title)
-            title = re.sub(r'\s+', ' ', title).rstrip()
-            if search.lower() == str(title).lower():
-                return False, result
-            # the title ends with season number
-            elif title.lower().endswith(str(season)):
-                # https://anilist.co/anime/14397/Chihayafuru-2/
-                # https://anilist.co/anime/21004/Kaitou-Joker-2/
-                # https://anilist.co/anime/21856/Boku-no-Hero-Academia-2/
-                # https://anilist.co/anime/100280/Star-Mu-3/
-                # https://anilist.co/anime/12365/Bakuman-3/
-                return False, result
-            # if the title ends with the season number
-            elif f"season {season}" in title.lower():
-                # https://anilist.co/anime/122808/Princess-Connect-ReDive-Season-2/
-                return False, result
-            elif f"{num2words(season, to='ordinal')} season" in title.lower():
-                # https://anilist.co/anime/100133/One-Room-Second-Season/
-                # https://anilist.co/anime/21085/Diamond-no-Ace-Second-Season/
-                # https://anilist.co/anime/2014/Taiho-Shichauzo-SECOND-SEASON/
-                # https://anilist.co/anime/17074/Monogatari-Series-Second-Season/
-                return False, result
-            # if the title has `ordinal number season` in it
-            elif f"{num2words(season, to='ordinal_num')} season" in title.lower():
-                # https://anilist.co/anime/10997/Fujilog-2nd-Season/
-                # https://anilist.co/anime/101633/BanG-Dream-2nd-Season/
-                # https://anilist.co/anime/9656/Kimi-ni-Todoke-2nd-Season/
-                # https://anilist.co/anime/20985/PriPara-2nd-Season/
-                # https://anilist.co/anime/97665/Rewrite-2nd-Season/
-                # https://anilist.co/anime/21559/PriPara-3rd-Season/
-                # https://anilist.co/anime/101634/BanG-Dream-3rd-Season/
-                return False, result
-            # if the title has `episode title` in it.
-            elif anime.get("episode_title", None) and anime.get("episode_title", None).lower() in title.lower():
-                return False, result
-
-        # attempt to retrieve from the year it published
-        # the result returned from anilist are sort by similarity,
-        # we assume the first result is the first season
-        # wrong guessing could come from here
-        # it too naive, but it works for most cases
-        # [ASW] 86 - Eighty Six - 21 [1080p HEVC][9D595499].mkv
-        # [ASW] Digimon Adventure (2020) - 01 [1080p HEVC][2D916E78].mkv
-        #
-        if results[0]["title"]["romaji"] in result["title"]["romaji"]:
-            season_year += 1
-            # error when the result is not return the first season of that anime
-            if season_year == season:
-                candidate = result
-    if candidate:
-        return False, candidate
-    return True, anime
-
-
 @devlog.log_on_error(trace_stack=True)
-def anime_check(anime: dict):
-    # remove everything in bracket from the title
-    # non-alphanumeric characters
-    # and double spaces
-    search = re.sub(r"[(\[{].*?[)\]}]|[-:]", ' ', anime['anime_title'])
-    search = re.sub(r"([^\w+])+", ' ', search)
-    search = re.sub(r'\s+', ' ', search).rstrip()
-    f_search = search
-    season = int(anime.get("anime_season", 1))
-    if season > 1:
-        f_search += f' {num2words(season, to="ordinal_num")} season'
+def anime_check(anime: dict, is_folder: bool = False):
+    # remove non-alphanumeric characters
+    search = re.sub(r"([^\w+])+", ' ', anime['anime_title'])
+    if (anime.get("episode_title", '')).lower().startswith('part'):
+        search += f' {anime.get("episode_title", "")}'
 
-    if (eps_title := anime.get("episode_title", '')).lower().startswith('part'):
-        f_search += f' {eps_title}'
+    # remove double spaces
+    search = re.sub(r'\s+', ' ', search).strip()
 
-    # remove all unnecessary double spaces
-    f_search = re.sub(r'\s+', ' ', f_search).rstrip()
-
-    # separate the variable for stack trace
-    data = search_anime_info_anilist(f_search, per_page=100)
-    results = data['data']['Page']['media']
-
-    if not results:
+    # get all data
+    db_result = helper.anime_season_relation(anime)
+    if db_result:
+        result = get_anime_info_anilist(db_result)
+        result["id"] = db_result
+        results = []
+    else:
         data = search_anime_info_anilist(search, per_page=100)
         results = data['data']['Page']['media']
+        if len(results) == 1:
+            # if the result is only one, then we can assume it is the correct anime
+            candidate = (0, 1.0)  # index, score
+            synonyms = (0, 1.0)  # index, score
+        else:
+            candidate = (0, 0)  # index, score
+            synonyms = (0, 0)  # index, score
 
-    # try to guess the season
-    fail, result = result_parser(anime, season, search, results)
-    if fail:
-        return result
+        for index, result in enumerate(results):
+            for title in result["title"].values():
+                if anime.get("anime_year", False):
+                    # we detect the year in anime title, then we focused one year behind and one year ahead
+                    if not (int(anime.get("anime_year", False)) - 1 <=
+                            result.get("seasonYear") <=
+                            int(anime.get("anime_year", False)) + 1):
+                        continue
+                # some anime doesn't have english title
+                if title is None:
+                    # https://anilist.co/anime/8440/Black-Lagoon-Omake/
+                    # https://anilist.co/anime/139630/Boku-no-Hero-Academia-6/
+                    # https://anilist.co/anime/20767/Date-A-Live-II-Kurumi-Star-Festival/
+                    continue
+
+                # remove non-alphanumeric characters
+                title = re.sub(r'[^A-Za-z\d]+', ' ', title)
+                ratio = SequenceMatcher(None, search.lower(), title.lower()).ratio()
+                if ratio > candidate[1]:
+                    candidate = (index, ratio)
+                    # we found the anime
+                    if ratio == 1.0:
+                        break
+
+            for synonym in result["synonyms"]:
+                ratio = SequenceMatcher(None, search.lower(), synonym.lower()).ratio()
+                if ratio > candidate[1]:
+                    synonyms = (index, ratio)
+
+        # if the result is not found, then try checking the synonyms
+        if candidate[1] < 0.95:
+            # if the result still below 0.95 after checking synonyms, then return
+            if synonyms[1] < 0.95:
+                anime["anime_type"] = "torrent"
+                return anime
+            else:
+                candidate = synonyms
+
+        # we have a candidate for the first season of the anime
+        result = results[candidate[0]]
+
+        # if the anime season greater than 1, then we need to check the second season
+        if int(anime.get("anime_season", 1)) > 1:
+            first_season = result["title"]["romaji"].lower()
+            season = int(anime.get("anime_season", 1))
+            for result in results:
+                if anime.get("anime_year", False):
+                    # we have the anime year candidate
+                    if str(result.get("seasonYear")) != anime.get("anime_year", False):
+                        continue
+                # attempt to retrieve from the description
+                # if the description is none, then skip it
+                if result["description"] is not None:
+                    if f"{num2words(season, to='ordinal')} season" in result["description"].lower():
+                        # https://anilist.co/anime/114233/Gundam-Build-Divers-ReRISE-2nd-Season/
+                        # https://anilist.co/anime/20723/Yowamushi-Pedal-GRANDE-ROAD
+                        break
+                    elif f"after the {num2words(season - 1, to='ordinal')} season" in result["description"].lower():
+                        # https://anilist.co/anime/14693/Yurumates-3D-Plus
+                        break
+                    elif f"after season {num2words(season - 1, to='cardinal')}" in result["description"].lower():
+                        # https://anilist.co/anime/558/Major-S2
+                        break
+                    elif f"of the {num2words(season - 1, to='ordinal')} season" in result["description"].lower():
+                        # https://anilist.co/anime/21856/Boku-no-Hero-Academia-2/
+                        break
+
+                # attempt to retrieve from the title
+                for title in list(result["title"].values()):
+                    # remove non-alphanumeric characters
+                    if title is None:
+                        continue
+                    title = re.sub(r"([^\w+])+", ' ', title)
+                    title = re.sub(r'\s+', ' ', title).rstrip()
+                    if search.lower() == str(title).lower():
+                        continue
+                    # the title ends with season number
+                    elif title.lower().endswith(str(season)):
+                        # https://anilist.co/anime/14397/Chihayafuru-2/
+                        # https://anilist.co/anime/21004/Kaitou-Joker-2/
+                        # https://anilist.co/anime/21856/Boku-no-Hero-Academia-2/
+                        # https://anilist.co/anime/100280/Star-Mu-3/
+                        # https://anilist.co/anime/12365/Bakuman-3/
+                        break
+                    # if the title ends with the season number
+                    elif f"season {season}" in title.lower():
+                        # https://anilist.co/anime/122808/Princess-Connect-ReDive-Season-2/
+                        break
+                    elif f"{num2words(season, to='ordinal')} season" in title.lower():
+                        # https://anilist.co/anime/100133/One-Room-Second-Season/
+                        # https://anilist.co/anime/21085/Diamond-no-Ace-Second-Season/
+                        # https://anilist.co/anime/2014/Taiho-Shichauzo-SECOND-SEASON/
+                        # https://anilist.co/anime/17074/Monogatari-Series-Second-Season/
+                        break
+                    # if the title has `ordinal number season` in it
+                    elif f"{num2words(season, to='ordinal_num')} season" in title.lower():
+                        # https://anilist.co/anime/10997/Fujilog-2nd-Season/
+                        # https://anilist.co/anime/101633/BanG-Dream-2nd-Season/
+                        # https://anilist.co/anime/9656/Kimi-ni-Todoke-2nd-Season/
+                        # https://anilist.co/anime/20985/PriPara-2nd-Season/
+                        # https://anilist.co/anime/97665/Rewrite-2nd-Season/
+                        # https://anilist.co/anime/21559/PriPara-3rd-Season/
+                        # https://anilist.co/anime/101634/BanG-Dream-3rd-Season/
+                        break
+                    # if the title has `episode title` in it.
+                    elif anime.get("episode_title", None) and anime.get("episode_title",
+                                                                        None).lower() in title.lower():
+                        break
+                else:
+                    continue
+                break
 
     # looking is the anime are continuing episode or not
     (show_id, ep) = (result['id'], int(anime.get('episode_number', 0)))
@@ -198,23 +220,34 @@ def track(anime_filepath, is_folder=False):
         last_day_check = date.today().day
 
     # we expected to get the anime filepath
-    paths = anime_filepath.split("/")
+    folder_path, anime_filename = os.path.split(anime_filepath)  # type: str, str
 
     # the last element is the anime filename
-    anime_filename = paths[-1]
     anime = parsing(anime_filename, is_folder)
 
+    if anime.get("anime_type", "").lower() in CONFIG["ignored_type"]:
+        # remove the anime_type from the title
+        anime["anime_title"] = re.sub(r'\b' + anime.get("anime_type", "").lower() + r'\b', '', anime["anime_title"],
+                                      flags=re.IGNORECASE)
+        # remove the episode number
+        anime.pop("episode_number", None)
+        # this is an extras. So, put it inside extras folder related to the anime
+        anime["anime_extras"] = True
+        is_folder = True
     # ignore if the anime are recap episode, usually with float number
     try:
         if not float(anime.get("episode_number", 0)).is_integer():
             return anime
     except TypeError:
-        if not is_folder:
-            return anime
-        # multiple episodes detected, probably from concat episode, or batch eps
-        # we will ignore the episode
-        CONFIG["logger"].info(f"{anime_filename} has multiple episodes or batch release")
-        anime["episode_number"] = -1
+        # no folder detection yet
+        # if not folder_path:
+        return anime
+        # else:
+        #     anime = parsing(folder_path, is_folder=True)
+        # # multiple episodes detected, probably from concat episode, or batch eps
+        # # we will ignore the episode
+        # CONFIG["logger"].info(f"{anime_filename} has multiple episodes or batch release")
+        # anime["episode_number"] = -1
 
     # check if we detect multiple anime season
     if isinstance(anime.get('anime_season'), list):
@@ -224,7 +257,7 @@ def track(anime_filepath, is_folder=False):
         if len(anime.get('anime_season', [])) == 2:
             number = int(anime['anime_season'][0])
             if number == 0:
-                anime['anime_type'] = "0Season"
+                anime['anime_type'] = "torrent"
             else:
                 anime["anime_title"] += f" {num2words(number, to='ordinal_num')} season"
                 anime['anime_season'] = anime['anime_season'][1]
@@ -233,7 +266,8 @@ def track(anime_filepath, is_folder=False):
             return anime
 
     elif int(anime.get('anime_season', -1)) == 0:
-        anime['anime_type'] = "0Season"
+        anime['anime_type'] = "torrent"
+        CONFIG["logger"].info(f"Anime with 0 season found \n{anime}")
 
     if anime["anime_title"] in anime.get("episode_title", '') or \
             anime.get("episode_title", '').lower() == "end":  # usually last eps from Erai-raws release
@@ -242,41 +276,53 @@ def track(anime_filepath, is_folder=False):
         except KeyError:
             pass
 
-    if (str(anime["anime_type"]).lower() not in CONFIG["ignored_type"] and
-            float(anime.get("episode_number", 0)).is_integer() and
-            anime.get('file_extension', '') in CONFIG["valid_ext"] or
+    if (anime.get('file_extension', '') in CONFIG["valid_ext"] or
             is_folder):
         # this anime is not in ignored type and not episode with comma (recap eps)
 
-        # if the anime title in the custom db, return it mal, kitsu, anilist id instead.
         # attempt to parse from the title
         if anime.get("anime_title", None):
-            anime = anime_check(anime)
+            anime = anime_check(anime, is_folder)
         else:
             CONFIG["logger"].info(f"Confused about this anime \n{anime}")
             return anime
-        guess = anime.copy()
-        while anime.get("anime_type", None) == "torrent":
-            # attempt to parse from the folder name
-            # look up to 2 level above
-            for path in paths[:-3:-1]:
-                guess_title = parsing(path, is_folder)
-                if guess_title.get("anime_title", "None").lower() in CONFIG["folder_blacklist"]:
-                    continue
-                guess["anime_title"] = guess_title["anime_title"]
-                anime = anime_check(guess)
-                break
-            break
-        if guess.get("anime_type", None) != "torrent":
-            return guess
+        # no folder detection added yet.
+        # guess = anime.copy()
+        # while anime.get("anime_type", None) == "torrent":
+        #     # attempt to parse from the folder name
+        #     # look up to 2 level above
+        #     for path in paths[:-3:-1]:
+        #         guess_title = parsing(path, is_folder)
+        #         if guess_title.get("anime_title", "None").lower() in CONFIG["folder_blacklist"]:
+        #             continue
+        #         guess["anime_title"] = guess_title["anime_title"]
+        #         anime = anime_check(guess)
+        #         break
+        #     break
+        # if guess.get("anime_type", None) != "torrent":
+        #     return guess
     return anime
 
 
 def parsing(filename, is_folder):
-    filename = re.sub(r'(\d+)v([2-9])', r'\1 v\2 ', filename)
+    # make sure the version number has space before it
+    filename = re.sub(r'(\d+)v(\d+)', r'\1 v\2 ', filename)
+    filename = re.sub(r'\boads?\b', 'ova', filename, flags=re.IGNORECASE)
+    filename = re.sub(r'\boavs?\b', 'ova', filename, flags=re.IGNORECASE)
+    filename = re.sub(r'\b&\b', 'and', filename, flags=re.IGNORECASE)
+    # filename = re.sub(r'\bthe animation\b', '', filename, flags=re.IGNORECASE)
+    # filename = re.sub(r'\bthe\b', '', filename, flags=re.IGNORECASE)
+    # filename = re.sub(r'\bepisode\b', '', filename, flags=re.IGNORECASE)
+    filename = re.sub(r'\bspecials?\b', 'special', filename, flags=re.IGNORECASE)
+
     anime = anitopy.parse(filename)
+    # remove everything in bracket from the title
+    anime_name = re.sub(r"[(\[{].*?[)\]}]|[-:]", ' ', anime['anime_title'])
+    # replace any non-alphanumeric character with space and convert to lower case
+    anime_name = re.sub(r'[^A-Za-z\d]+', ' ', anime_name).lower()
     # by default, all anime will treat as unknown type
-    anime['anime_type'] = 'torrent'
+    anime["anime_title"] = anime_name.strip()
+    anime['anime_type'] = anime.get("anime_type", "torrent")
     anime["anilist"] = 0
     anime["isFolder"] = is_folder
     return anime
