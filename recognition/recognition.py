@@ -1,5 +1,4 @@
 import functools
-import logging
 import os
 import re
 from datetime import date
@@ -24,7 +23,7 @@ redirect = None
 def load_update():
     global last_check, redirect
     # get the GitHub commit link
-    commit = requests.get(CONFIG["link"])
+    commit = requests.get(CONFIG["commit_link"])
     relation_file_path = CONFIG["relation_file_path"]
     # if we successfully get the commit, check if the file is updated
     if commit.status_code == 200:

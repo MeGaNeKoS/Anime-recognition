@@ -1,10 +1,8 @@
 import logging
 
-
-CONFIG = {
-    "relation_file_path": "./data/anime-relations/anime-relations.txt",
-    "source_api": "anilist",  # mal, kitsu, anilist
-    "link": "https://api.github.com/repos/erengy/anime-relations/commits?path=anime-relations.txt&per_page=1",
+CONFIG = {"relation_file_path": "./data/anime-relations/anime-relations.txt", "source_api": "anilist",
+    # mal, kitsu, anilist
+    "commit_link": "https://api.github.com/repos/erengy/anime-relations/commits?path=anime-relations.txt&per_page=1",
     "file_link": 'https://raw.githubusercontent.com/erengy/anime-relations/master/anime-relations.txt',
     "title": "romaji",
     "folder_blacklist": ["extra", "extras", "ova", "attachment", "ncop", "nced", "nc", "anime", "specials", "ova",
@@ -16,19 +14,8 @@ CONFIG = {
 }
 
 logger = logging.getLogger(__package__)  # set package logger configuration
-logger.setLevel(logging.ERROR)
-
-formatter = logging.Formatter('%(levelname)s:%(name)s:%(message)s')
-file_handler = logging.FileHandler('app.log', encoding="utf-8")
-file_handler.setFormatter(formatter)
-file_handler.setLevel(logging.INFO)
 
 CONFIG["logger"] = logger
-CONFIG["log_handler"] = [file_handler]
-
-for handler in CONFIG["log_handler"]:
-    logger.addHandler(handler)
-
 
 # def set_config(**kwargs):
 #     edit_log_handler = False
@@ -50,4 +37,3 @@ for handler in CONFIG["log_handler"]:
 #     if edit_logger:
 #         for handler in CONFIG["log_handler"]:
 #             CONFIG["logger"].addHandler(handler)
-
