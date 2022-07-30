@@ -276,6 +276,9 @@ def anime_check(anime: dict, is_folder: bool = False):
                 else:
                     continue
                 break
+            else:
+                # after checking all the results, we still can't find the correct season
+                return anime
 
     # looking is the anime are continuing episode or not
     (show_id, ep) = (result['id'], int(anime.get('episode_number', 0)))
