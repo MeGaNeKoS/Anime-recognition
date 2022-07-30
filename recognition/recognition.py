@@ -136,6 +136,8 @@ def anime_check(anime: dict, is_folder: bool = False):
     # remove double spaces
     search = re.sub(r'\s+', ' ', search).strip()
 
+    # convert to lower character, since it doesnt affect the search
+    search = search.lower()
     # get all data
     db_result = helper.anime_season_relation(anime)
     if db_result:
@@ -143,7 +145,9 @@ def anime_check(anime: dict, is_folder: bool = False):
         result["id"] = db_result
         results = []
     else:
-        data = search_anime_info_anilist(search, per_page=100)
+        compared_search = re.sub(r"([^\w+])+", '', search)
+        compared_search = re.sub(r'\s+', '', compared_search).strip()
+        data = search_anime_info_anilist(search)
         results = data['data']['Page']['media']
         if len(results) == 1:
             # if the result is only one, then we can assume it is the correct anime
@@ -175,20 +179,38 @@ def anime_check(anime: dict, is_folder: bool = False):
                     # https://anilist.co/anime/20767/Date-A-Live-II-Kurumi-Star-Festival/
                     continue
 
+                # remove anything inside bracket, e.g. Hunter x Hunter (2011)
+                title = re.sub(r"[(\[{].*?[)\]}]|[-:]", ' ', title)
+
                 # remove non-alphanumeric characters
-                title = re.sub(r'[^A-Za-z\d]+', ' ', title)
-                ratio = SequenceMatcher(None, search.lower(), title.lower()).ratio()
+                # review later for nisekoi:, okusama ga saitokaichou!+!
+                compared_title = re.sub(r"([^\w+])+", '', title)
+
+                # remove any spaces in search
+                compared_title = re.sub(r'\s+', '', compared_title).strip()  # To love Ru
+
+                ratio = SequenceMatcher(None, compared_search, compared_title.lower()).ratio()
                 if ratio > candidate[1]:
                     candidate = (index, ratio)
                     # we found the anime
                     if ratio == 1.0:
                         break
+            else:
+                for synonym in result["synonyms"]:
+                    # remove anything inside bracket, e.g. Hunter x Hunter (2011)
+                    synonym = re.sub(r"[(\[{].*?[)\]}]|[-:]", ' ', synonym)
 
-            for synonym in result["synonyms"]:
-                ratio = SequenceMatcher(None, search.lower(), synonym.lower()).ratio()
-                if ratio > candidate[1]:
-                    synonyms = (index, ratio)
+                    # remove non-alphanumeric characters
+                    compared_synonym = re.sub(r"([^\w+])+", '', synonym)
 
+                    # remove any spaces in search
+                    compared_synonym = re.sub(r'\s+', '', compared_synonym).strip()  # To love Ru
+
+                    ratio = SequenceMatcher(None, compared_search, compared_synonym.lower()).ratio()
+                    if ratio > synonyms[1]:
+                        synonyms = (index, ratio)
+                continue
+            break
         # if the result is not found, then try checking the synonyms
         if candidate[1] < 0.95:
             # if the result still below 0.95 after checking synonyms, then return
