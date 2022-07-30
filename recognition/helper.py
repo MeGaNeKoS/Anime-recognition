@@ -20,7 +20,7 @@ def anime_season_relation(anime):
         # the anime season should be a string of a number without leading zero and can't be negative
         logger.info("Found in the anime in database")
         if anime_season:
-            anime_relation = anime_relation.get(str(int(anime_season)), None)
+            anime_relation = anime_relation.get(str(int(anime_season)), {})
 
         # optional
         if anime.get("anime_type", "torrent") != "torrent":
@@ -35,7 +35,7 @@ def anime_season_relation(anime):
         # if we don't have the anime season in the anime relation, then we want to ask the user to enter the anime id
         if anime_relation:
             # if the anime fansub in the anime relation
-            anime_id = anime_relation.get(anime.get('release_group').lower(), None)
+            anime_id = anime_relation.get(anime.get('release_group', "").lower(), None)
             # else we return the default value
             if anime_id is None:
                 anime_id = anime_relation.get("anilist", None)
