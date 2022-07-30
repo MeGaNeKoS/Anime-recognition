@@ -127,9 +127,11 @@ def get_anime_info_anilist(anime_id):
 @devlog.log_on_error(trace_stack=True)
 def anime_check(anime: dict, is_folder: bool = False):
     # remove non-alphanumeric characters
-    search = re.sub(r"([^\w+])+", ' ', anime['anime_title'])
-    if (anime.get("episode_title", '')).lower().startswith('part'):
-        search += f' {anime.get("episode_title", "")}'
+    # search = re.sub(r"([^\w+])+", ' ', anime['anime_title'])
+    search = anime['anime_title']
+    is_part = re.match(r'^(part \d)', anime.get("episode_title", ""), flags=re.IGNORECASE)
+    if is_part:
+        search += f' {is_part.group(1)}'
 
     # remove double spaces
     search = re.sub(r'\s+', ' ', search).strip()
