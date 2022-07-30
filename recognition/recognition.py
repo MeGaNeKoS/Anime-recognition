@@ -344,7 +344,20 @@ def track(anime_filepath, is_folder=False):
 
     # ignore if the anime are recap episode, usually with float number
     try:
-        if not float(anime.get("episode_number", 0)).is_integer():
+        episode_number = str(anime.get("episode_number", 0))
+        if episode_number.isalnum() and not episode_number.isdigit():
+            if episode_number[-1].isdigit():
+                # it means the alphabet is in the middle of the episode number
+                CONFIG["logger"].info(f"Ignore {anime['anime_title']} with episode number {episode_number}\n{anime}")
+                return anime
+            # 01A, episode 1 part 1 or A
+            eps = ""
+            for char in episode_number:
+                if char.isdigit():
+                    eps += char
+            anime["episode_number"] = episode_number = int(eps)
+
+        if not float(episode_number).is_integer():
             return anime
     except TypeError:
         # no folder detection yet
