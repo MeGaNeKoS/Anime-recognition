@@ -20,6 +20,77 @@ last_check = None
 last_day_check = None
 redirect = None
 
+search_anime_query = """
+                query ($query: String, $page: Int, $perPage: Int) {
+                    Page (page: $page, perPage: $perPage) {
+                        pageInfo {
+                            total
+                            currentPage
+                            lastPage
+                            hasNextPage
+                        }
+                        media (search: $query, type: ANIME) {
+                            id
+                            title {
+                                romaji
+                                english
+                            }
+                            synonyms
+                            countryOfOrigin
+                            format
+                            status
+                            episodes
+                            duration
+                            startDate {
+                                year
+                            }
+                            endDate {
+                                year
+                            }
+                            season
+                            seasonYear
+                            isAdult
+                            genres
+                            averageScore
+                            meanScore
+                            hashtag
+                            bannerImage                            
+                            description
+                            }
+                    }
+                }
+            """
+get_anime_query = """
+                query ($id: Int) {
+                    Media(id: $id, type: ANIME) {
+                        title {
+                            romaji
+                            english
+                        }
+                        bannerImage
+                        format
+                        status
+                        episodes
+                        duration
+                        startDate {
+                            year
+                        }
+                        endDate {
+                            year
+                        }
+                        season
+                        seasonYear
+                        isAdult
+                        genres
+                        countryOfOrigin
+                        description
+                        averageScore
+                        meanScore
+                        synonyms
+                    }
+                }
+            """
+
 
 def load_update():
     global last_check, redirect
@@ -42,12 +113,14 @@ def load_update():
 
 @functools.lru_cache(maxsize=10)
 def search_anime_info_anilist(title, *args, **kwarg):
-    return instance.search.anime(title, *args, **kwarg)
+    variables = {"query": title, "page": 1, "perPage": 10}
+    return instance.search.custom_query(variables, search_anime_query, *args, **kwarg)
 
 
 @functools.lru_cache(maxsize=10)
 def get_anime_info_anilist(anime_id):
-    result = instance.get.anime(anime_id)
+    variables = {"id": anime_id}
+    result = instance.search.custom_query(variables, get_anime_query)
     return result["data"]["Media"]
 
 
@@ -79,14 +152,21 @@ def anime_check(anime: dict, is_folder: bool = False):
             synonyms = (0, 0)  # index, score
 
         for index, result in enumerate(results):
-            for title in result["title"].values():
-                if anime.get("anime_year", False):
-                    # we detect the year in anime title, then we focused one year behind and one year ahead
-                    if not (int(anime.get("anime_year", False)) - 1 <=
-                            result.get("seasonYear") <=
-                            int(anime.get("anime_year", False)) + 1):
-                        continue
-                # some anime doesn't have english title
+            if anime.get("anime_year", False):
+                result_year = result["seasonYear"]
+                if result_year is None:
+                    if result["startDate"]["year"] is not None:
+                        result_year = result["startDate"]["year"]
+                    else:
+                        result_year = result["endDate"]["year"]
+
+                # we detect the year in anime title, then we focused one year behind and one year ahead
+                if not (int(anime.get("anime_year", False)) - 1 <=
+                        (result_year or -2) <=
+                        int(anime.get("anime_year", 9999)) + 1):
+                    continue
+
+            for title in result["title"].values():                # some anime doesn't have english title
                 if title is None:
                     # https://anilist.co/anime/8440/Black-Lagoon-Omake/
                     # https://anilist.co/anime/139630/Boku-no-Hero-Academia-6/
@@ -205,6 +285,12 @@ def anime_check(anime: dict, is_folder: bool = False):
     # assign the correct anime info based on the config
     anime['anime_title'] = result['title'][CONFIG["title"]]
     anime["anime_year"] = result['seasonYear']
+    if anime["anime_year"] is None:
+        if result["startDate"]["year"] is not None:
+            anime["anime_year"] = result["startDate"]["year"]
+        else:
+            anime["anime_year"] = result['startDate']['year']
+    anime["anime_year"] = str(anime["anime_year"]) if anime["anime_year"] else None  # convert to string if not None
     # threat tv short as the same as tv (tv short mostly anime less than 12 minutes)
     anime["anime_type"] = 'TV' if result['format'] == 'TV_SHORT' else result['format']
     return anime
