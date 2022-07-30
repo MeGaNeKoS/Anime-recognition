@@ -251,44 +251,27 @@ def anime_check(anime: dict, is_folder: bool = False):
 
                 # attempt to retrieve from the title
                 for title in list(result["title"].values()):
-                    # remove non-alphanumeric characters
                     if title is None:
                         continue
-                    title = re.sub(r"([^\w+])+", ' ', title)
+
+                    # remove non-alphanumeric characters
+                    title = re.sub(r"([^\w+])+", ' ', title.lower())
+
+                    # remove double spaces
                     title = re.sub(r'\s+', ' ', title).rstrip()
-                    if search.lower() == str(title).lower():
+                    if search == title:
+                        # this is the first season, so skip it
                         continue
-                    # the title ends with season number
-                    elif title.lower().endswith(str(season)):
-                        # https://anilist.co/anime/14397/Chihayafuru-2/
-                        # https://anilist.co/anime/21004/Kaitou-Joker-2/
-                        # https://anilist.co/anime/21856/Boku-no-Hero-Academia-2/
-                        # https://anilist.co/anime/100280/Star-Mu-3/
-                        # https://anilist.co/anime/12365/Bakuman-3/
-                        break
-                    # if the title ends with the season number
-                    elif f"season {season}" in title.lower():
-                        # https://anilist.co/anime/122808/Princess-Connect-ReDive-Season-2/
-                        break
-                    elif f"{num2words(season, to='ordinal')} season" in title.lower():
-                        # https://anilist.co/anime/100133/One-Room-Second-Season/
-                        # https://anilist.co/anime/21085/Diamond-no-Ace-Second-Season/
-                        # https://anilist.co/anime/2014/Taiho-Shichauzo-SECOND-SEASON/
-                        # https://anilist.co/anime/17074/Monogatari-Series-Second-Season/
-                        break
-                    # if the title has `ordinal number season` in it
-                    elif f"{num2words(season, to='ordinal_num')} season" in title.lower():
-                        # https://anilist.co/anime/10997/Fujilog-2nd-Season/
-                        # https://anilist.co/anime/101633/BanG-Dream-2nd-Season/
-                        # https://anilist.co/anime/9656/Kimi-ni-Todoke-2nd-Season/
-                        # https://anilist.co/anime/20985/PriPara-2nd-Season/
-                        # https://anilist.co/anime/97665/Rewrite-2nd-Season/
-                        # https://anilist.co/anime/21559/PriPara-3rd-Season/
-                        # https://anilist.co/anime/101634/BanG-Dream-3rd-Season/
-                        break
-                    # if the title has `episode title` in it.
-                    elif anime.get("episode_title", None) and anime.get("episode_title",
-                                                                        None).lower() in title.lower():
+
+                    parsed_title = parsing(f"{title} 05", False)
+                    if parsed_title.get("anime_season", False) == season:
+                        # it the part of the season
+                        if parsed_title.get("episode_title") and is_part:
+                            if parsed_title.get("episode_title").lower() == is_part.lower():
+                                break
+                            else:
+                                continue
+                        # we found it
                         break
                 else:
                     continue
