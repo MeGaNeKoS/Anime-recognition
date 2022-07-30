@@ -330,6 +330,18 @@ def track(anime_filepath, is_folder=False):
         # this is an extras. So, put it inside extras folder related to the anime
         anime["anime_extras"] = True
         is_folder = True
+
+    # threat movies episode as season number,
+    if anime.get("anime_type", "").lower() == "movie":
+        title_split = re.match('(.*movie)(?:[\W]+)(\d+)(?:[\W]+)(.*)', anime["anime_title"], flags=re.IGNORECASE)
+        if title_split:
+            anime["anime_title"] = title_split.group(1)
+            if title_split.group(2):
+                anime["anime_season"] = int(title_split.group(2))
+
+            if title_split.group(3):
+                anime["episode_title"] = title_split.group(3)
+
     # ignore if the anime are recap episode, usually with float number
     try:
         if not float(anime.get("episode_number", 0)).is_integer():
