@@ -427,7 +427,6 @@ def track(anime_filepath, is_folder=False):
 
 def parsing(filename, is_folder):
     # make sure the version number has space before it
-    filename = re.sub(r'(\d+)v(\d+)', r'\1 v\2 ', filename)
     filename = re.sub(r'\boads?\b', 'ova', filename, flags=re.IGNORECASE)
     filename = re.sub(r'\boavs?\b', 'ova', filename, flags=re.IGNORECASE)
     filename = re.sub(r'\b&\b', 'and', filename, flags=re.IGNORECASE)
@@ -440,7 +439,9 @@ def parsing(filename, is_folder):
     # remove everything in bracket from the title
     anime_name = re.sub(r"[(\[{].*?[)\]}]|[-:]", ' ', anime['anime_title'])
     # replace any non-alphanumeric character with space and convert to lower case
-    anime_name = re.sub(r'[^A-Za-z\d]+', ' ', anime_name).lower()
+    # anime_name = re.sub(r'[^A-Za-z\d]+', ' ', anime_name).lower()
+    anime_name = re.sub(r'\s+', ' ', anime_name).lower()
+
     # by default, all anime will treat as unknown type
     anime["anime_title"] = anime_name.strip()
     anime['anime_type'] = anime.get("anime_type", "torrent")
