@@ -2,49 +2,59 @@ import json
 import logging
 import re
 
-logger = logging.getLogger(__name__)  # inherits package logger configuration
+from .config import CONFIG
+
+logger = logging.getLogger(__name__)
 SUPPORTED_APIS = ['mal', 'kitsu', 'anilist']
 
 
 def anime_season_relation(anime):
-    with open('./data/Anime-Fansub-Relation/anime-fansub-relation.json', "r+", encoding="utf-8") as input_json:
-        anime_fansub_relation = json.load(input_json)
-
-    anime_relation = anime_fansub_relation.get(anime['anime_title'], None)
     anime_id = None
     anime_season = anime.get("anime_season", None)
 
-    # we found in database
-    if anime_relation:
-        # if we have the anime season in the anime relation
-        # the anime season should be a string of a number without leading zero and can't be negative
-        logger.info("Found in the anime in database")
-        if anime_season:
-            anime_relation = anime_relation.get(str(int(anime_season)), {})
+    try:
+        with open(CONFIG['file_path']['filename_relation'], "r+", encoding="utf-8") as input_json:
+            filename_relation = json.load(input_json)
+        anime_id = filename_relation.get(anime.get('file_name', ""), None)
+        anime["custom_filename"] = True  # just a mark to know that we use custom filename, no real use yet.
 
-        # optional
-        if anime.get("anime_type", "torrent") != "torrent":
-            logger.info("Found in the anime using the anime type")
-            anime_relation = anime_relation.get(anime.get("anime_type", "").lower(), anime_relation)
+        if anime_id is None:
+            with open(CONFIG['file_path']['fansub_relation'], "r+", encoding="utf-8") as input_json:
+                anime_fansub_relation = json.load(input_json)
 
-        if anime.get("anime_year", 0):
-            logger.info("Found in the anime using the anime type")
-            anime_relation = anime_relation.get(anime.get("anime_year", "").lower(), anime_relation)
+            anime_relation = anime_fansub_relation.get(anime['anime_title'], None)
+            # we found in database
+            if anime_relation:
+                # the anime season should be a string of a number without leading zero and can't be negative
+                # check for the anime type
+                if isinstance(anime.get("anime_type", None), list):
+                    for anime_type in anime.get("anime_type", []):
+                        if anime_type.lower() != "torrent":
+                            anime_relation = anime_relation.get(anime_type.lower(), {})
+                elif anime.get("anime_type", "torrent").lower() != "torrent":
+                    anime_relation = anime_relation.get(anime.get("anime_type", "").lower(), {})
 
-        # this can be change on code above, if we have the anime season in the anime relation
-        # if we don't have the anime season in the anime relation, then we want to ask the user to enter the anime id
-        if anime_relation:
-            # if the anime fansub in the anime relation
-            anime_id = anime_relation.get(anime.get('release_group', "").lower(), None)
-            # else we return the default value
-            if anime_id is None:
-                anime_id = anime_relation.get("anilist", None)
-                logger.info(f"Anime id are {anime_id}")
-            else:
-                logger.info(f"Anime with fansub from {anime.get('release_group')} are {anime_id}")
-        else:
-            logger.info(f"No Season {int(anime_season)} in database")
-    return anime_id
+                if anime_season is not None:
+                    anime_relation = anime_relation.get(str(int(anime_season)), {})
+
+                if anime.get("anime_year", 0):
+                    anime_relation = anime_relation.get(anime.get("anime_year", "").lower(), anime_relation)
+
+                # this can be change on code above, if we have the anime season in the anime relation
+                if anime_relation:
+                    # if the anime fansub in the anime relation
+                    anime_id = anime_relation.get(anime.get('release_group', "").lower(), None)
+                    # else we return the default value
+                    if anime_id is None:
+                        anime_id = anime_relation.get("anilist", None)
+                        logger.debug(f"Anime id are {anime_id}")
+                    else:
+                        logger.debug(f"Anime id  from fansub {anime.get('release_group')} are {anime_id}")
+                else:
+                    logger.debug(f"No Season {anime_season} in database")
+    except (FileNotFoundError, ValueError, TypeError):
+        pass
+    return anime, anime_id
 
 
 def parse_anime_relations(filename, api='anilist'):
@@ -60,12 +70,10 @@ def parse_anime_relations(filename, api='anilist'):
     with open(filename) as f:
 
         relations = {'meta': {}}
-        id_pattern = "(\d+|[\?~])\|(\d+|[\?~])\|(\d+|[\?~])"
-        ep_pattern = "(\d+)-?(\d+|\?)?"
+        id_pattern = r"(\d+|[\?~])\|(\d+|[\?~])\|(\d+|[\?~])"
+        ep_pattern = r"(\d+)-?(\d+|\?)?"
         full = r'- {0}:{1} -> {0}:{1}(!)?'.format(id_pattern, ep_pattern)
         _re = re.compile(full)
-        version = r'- version: (\d.+)'
-        _re_version = re.compile(version)
 
         mode = 0
 
@@ -76,7 +84,6 @@ def parse_anime_relations(filename, api='anilist'):
                 continue
             if line[0] == '#':
                 continue
-
             if mode == 0 and line == "::rules":
                 mode = 1
             elif mode == 1 and line[0] == '-':
@@ -90,7 +97,8 @@ def parse_anime_relations(filename, api='anilist'):
                         continue
                     else:
                         src_id = int(src_id)
-
+                    if src_id == 2251 or src_id == 21058:
+                        print("Found it!")
                     # Handle infinite ranges
                     if m.group(5) == '?':
                         src_eps = (int(m.group(4)), -1)
@@ -117,6 +125,11 @@ def parse_anime_relations(filename, api='anilist'):
                     if src_id not in relations:
                         relations[src_id] = []
                     relations[src_id].append((src_eps, dst_id, dst_eps))
+                    # Handle the destination ID is redirected to itself
+                    if m.group(11) == '!':
+                        if dst_id not in relations:
+                            relations[dst_id] = []
+                        relations[dst_id].append((dst_id, dst_id, dst_eps))
                 else:
                     logger.info("Not recognized. " + line)
 
@@ -139,3 +152,21 @@ def redirect_show(show_tuple, redirections):
     except KeyError:
         logger.debug(f"Show id {show_id} is not found on the redirections table!")
     return show_tuple
+
+
+def get_number(number_string: str):
+    digit = ""
+    try:
+        number = float(number_string)
+        if number.is_integer():
+            digit = str(int(number))
+        else:
+            digit = str(number)
+    except ValueError:
+        for x in number_string:
+            if x.isdigit():
+                digit += f"{x}"
+            else:
+                break
+    return digit
+

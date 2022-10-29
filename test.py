@@ -1,3 +1,7 @@
+from recognition import helper
+from recognition import CONFIG
+helper.parse_anime_relations(CONFIG['relation_file_path'])
+
 import logging
 from pprint import pprint
 
@@ -15,7 +19,7 @@ file_handler.setLevel(logging.DEBUG)
 logger.addHandler(file_handler)
 
 test = [
-    ["[Judas] 86 - Eighty Six (2021) - E11v2.mkv", 131586], # -> returns 116589
+    ["[Judas] 86 - Eighty Six (2021) - E11v2.mkv", 131586],  # -> returns 116589
     # there is no way to detect this anime, both part 1 and part 2 are in the same year
     ["[ASW] 86 - Eighty Six - 21 [1080p HEVC][9D595499].mkv", 131586],
     ["[Judas] Arakawa Under The Bridge - S01E06.mkv", 7647],
