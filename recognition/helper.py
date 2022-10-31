@@ -97,8 +97,6 @@ def parse_anime_relations(filename, api='anilist'):
                         continue
                     else:
                         src_id = int(src_id)
-                    if src_id == 2251 or src_id == 21058:
-                        print("Found it!")
                     # Handle infinite ranges
                     if m.group(5) == '?':
                         src_eps = (int(m.group(4)), -1)
@@ -129,7 +127,7 @@ def parse_anime_relations(filename, api='anilist'):
                     if m.group(11) == '!':
                         if dst_id not in relations:
                             relations[dst_id] = []
-                        relations[dst_id].append((dst_id, dst_id, dst_eps))
+                        relations[dst_id].append((dst_eps, dst_id, dst_eps))
                 else:
                     logger.info("Not recognized. " + line)
 
@@ -169,4 +167,3 @@ def get_number(number_string: str):
             else:
                 break
     return digit
-

@@ -1,4 +1,3 @@
-
 CONFIG = {
     "file_path": {
         "anime_relation": "data/anime-relations.txt",

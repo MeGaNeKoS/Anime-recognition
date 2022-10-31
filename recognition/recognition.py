@@ -52,7 +52,10 @@ def load_update():
         commit = requests.get(commit_link)
         relative_file_path = CONFIG["file_path"][commit_type]
         if commit.status_code == 200:
-            latest = commit_link.json()[0]['commit']['author']['date'].split("T")[0]
+            try:
+                latest = commit_link.json()[0]['commit']['author']['date'].split("T")[0]
+            except Exception:
+                continue
             # if the file is updated, download the file
             if latest is not last_check.get(commit_type, None):
                 last_check[commit_type] = latest
@@ -173,7 +176,7 @@ def anime_check(anime: dict, offline: bool = False):
                         if ratio == 1.0:
                             break
                 else:
-                    for synonym in result["synonyms"]:
+                    for synonym in result.get("synonyms", []):
                         # remove anything inside bracket, e.g. Hunter x Hunter (2011)
                         synonym = re.sub(r"[(\[{].*?[)\]}]|[-:]", ' ', synonym)
 
@@ -406,7 +409,7 @@ def track(anime_filepath, is_folder=False, offline=False):
             # if guess.get("anime_type", None) != "torrent":
             #     return guess
         if anime.get("anime_type", None) != "torrent" and anime.get("anilist", 0) == 0 and not offline:
-            logger.info(f"anime type was torrent but the id not 0 \n{anime}")
+            logger.info(f"anime type was not torrent but the id 0 \n{anime}")
             anime["anime_type"] = "torrent"
         return return_formatter(anime)
     except Exception as e:
@@ -485,7 +488,7 @@ def parsing(filename, is_folder=False) -> tuple[dict, bool]:
                       flags=re.IGNORECASE)
     filename = re.sub(r"\b(?:clean ?)?(op|ncop|openings?)(v\d+)\b", r"\1 \2", filename,
                       flags=re.IGNORECASE)
-    filename = re.sub(r"\b(?:clean ?)(op|ncop|openings?)\b", r"\1", filename,
+    filename = re.sub(r"\b(?:clean ?)?(op|ncop|openings?)\b", r"\1", filename,
                       flags=re.IGNORECASE)
 
     # remove the eps part or alt version of episode number
@@ -584,7 +587,7 @@ def normalize_anime_format_type(anime, anime_type, filename):
     # normalize the anime type for ending
     elif anime_type in ['ed', 'ending', 'nced']:
         anime_type = "ending"
-        ending_number = re.match(r"ending(?:.*(\d+))", filename)
+        ending_number = re.match(r"ending.*(\d+)", filename)
         if ending_number:
             anime["episode_number"] = ending_number.group(1)
         if anime.get("episode_number", None) is not None:
@@ -594,7 +597,7 @@ def normalize_anime_format_type(anime, anime_type, filename):
     # normalize the anime type for opening
     elif anime_type in ['op', 'opening', 'ncop']:
         anime_type = "opening"
-        opening_number = re.match(r"opening(?:.*(\d+))", filename)
+        opening_number = re.match(r"opening.*(\d+)", filename)
         if opening_number:
             anime["episode_number"] = opening_number.group(1)
         if anime.get("episode_number", None) is not None:
