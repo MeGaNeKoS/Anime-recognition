@@ -45,29 +45,32 @@ close_brackets = (
 escaped_bracket = "".join(re.escape(char) for char in open_brackets + close_brackets)
 
 
-def load_update():
+def load_update() -> None:
     global last_check, redirect
     # get the GitHub commit link
     for commit_type, commit_link in CONFIG["github_commit"].items():
-        commit = requests.get(commit_link)
-        relative_file_path = CONFIG["file_path"][commit_type]
-        if commit.status_code == 200:
-            try:
-                latest = commit_link.json()[0]['commit']['author']['date'].split("T")[0]
-            except Exception:
-                continue
-            # if the file is updated, download the file
-            if latest is not last_check.get(commit_type, None):
-                last_check[commit_type] = latest
-                new_anime_relation = requests.get(CONFIG["file_link"][commit_type]).content
-                os.makedirs("/".join(relative_file_path.split("/")[:-1]), exist_ok=True)
-                with open(relative_file_path, 'wb+') as outfile:
-                    outfile.write(new_anime_relation)
+        try:
+            commit = requests.get(commit_link)
+            relative_file_path = CONFIG["file_path"][commit_type]
+            if commit.status_code == 200:
+                latest = commit_link.json()[0]['commit']['author']['date']
+                # if the file is updated, download the file
+                if latest != last_check.get(commit_type, None):
+                    last_check[commit_type] = latest
+                    new_data = requests.get(CONFIG["file_link"][commit_type]).content
+                    os.makedirs("/".join(relative_file_path.split("/")[:-1]), exist_ok=True)
+                    with open(relative_file_path, 'wb+') as outfile:
+                        outfile.write(new_data)
+        except Exception:
+            pass
 
-    relation_file_path = CONFIG["file_path"]["anime_relation"]
-    # if we successfully get the commit, check if the file is updated
-    # load the localized anime relation file
-    redirect = helper.parse_anime_relations(relation_file_path, CONFIG["source_api"])
+    try:
+        relation_file_path = CONFIG["file_path"]["anime_relation"]
+        # if we successfully get the commit, check if the file is updated
+        # load the localized anime relation file
+        redirect = helper.parse_anime_relations(relation_file_path, CONFIG["source_api"])
+    except FileNotFoundError:
+        redirect = {}
 
 
 @functools.lru_cache(maxsize=CONFIG["mem_cache_size"])
@@ -87,7 +90,7 @@ def get_anime_info_anilist(anime_id):
     if not anime_id:
         return None
     try:
-        result = instance.get.anime(anime_id, True)
+        result = instance.get.anime(anime_id, None)
         return result["data"]["Media"]
     except Exception as e:
         logger.error(f"Error while getting anime info {anime_id}: {e}")
@@ -285,7 +288,8 @@ def anime_check(anime: dict, offline: bool = False):
             anime["anime_year"] = result.get("endDate", {}).get("year")
     anime["anime_year"] = str(anime["anime_year"]) if anime["anime_year"] else None  # convert to string if not None
     # threat tv short as the same as tv (tv short mostly anime less than 12 minutes)
-    anime["anime_type"] = 'TV' if result.get("format", "") == 'TV_SHORT' else result.get("format", "torrent")
+    if not offline:
+        anime["anime_type"] = 'TV' if result.get("format", "") == 'TV_SHORT' else result.get("format", "torrent")
     anime["verified"] = True
     return anime
 
@@ -303,8 +307,6 @@ def track(anime_filepath, is_folder=False, offline=False):
     try:
         anime, fails = parsing(anime_filename, is_folder)
         anime["verified"] = False
-        if offline:
-            anime["verified"] = True
 
         if fails:
             logger.error(f"Failed to parse {anime_filename}")
@@ -312,7 +314,6 @@ def track(anime_filepath, is_folder=False, offline=False):
 
         if isinstance(anime.get("anime_title", False), list):
             logger.info(f"Multiple anime found for {anime_filename}")
-            anime["verified"] = False
             return return_formatter(anime)
 
         if isinstance(anime.get("episode_number", False), list):
