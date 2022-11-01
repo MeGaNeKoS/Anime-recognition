@@ -313,12 +313,12 @@ def track(anime_filepath, is_folder=False, offline=False):
             return return_formatter(anime)
 
         if isinstance(anime.get("anime_title", False), list):
-            logger.info(f"Multiple anime found for {anime_filename}")
+            logger.error(f"Multiple anime found for {anime_filename}")
             return return_formatter(anime)
 
         if isinstance(anime.get("episode_number", False), list):
             # probably an episode batch where it concat the same arc
-            logger.info(f"Multiple episode number found for {anime_filename} {anime['episode_number']}")
+            logger.debug(f"Multiple episode number found for {anime_filename} {anime['episode_number']}")
             anime["episode_number"] = anime["episode_number"][0]
 
         # ignore if the anime are recap episode, usually with float number
@@ -329,7 +329,7 @@ def track(anime_filepath, is_folder=False, offline=False):
                 # "ep 12.5" won't be in this block since it failed the isalnum()
                 if episode_number[-1].isdigit():
                     # it means the alphabet is in the middle of the episode number
-                    logger.info(f"Ignore {anime['anime_title']} with episode number {episode_number}\n{anime}")
+                    logger.error(f"Ignore {anime['anime_title']} with episode number {episode_number}\n{anime}")
                     return return_formatter(anime)
                 # 01A, episode 1 part 1 or A
                 eps = ""
@@ -361,7 +361,7 @@ def track(anime_filepath, is_folder=False, offline=False):
             # we could try to guess the season.
             # Usually the first are season and the second are part of the season (e.g. s2 part 1, s2 part 2)
             if len(anime.get('anime_season', [])) == 2:
-                logger.info(f"Multiple anime season found for {anime_filename}")
+                logger.debug(f"Multiple anime season found for {anime_filename}")
                 number = int(anime['anime_season'][0])
                 if number == 0:
                     anime['anime_type'] = "torrent"
@@ -369,13 +369,13 @@ def track(anime_filepath, is_folder=False, offline=False):
                     anime["anime_title"] += f" part {anime['anime_season'][1]}"
                     anime['anime_season'] = number
             else:
-                logger.info(f"Confused about this anime season\n{anime}")
+                logger.error(f"Confused about this anime season\n{anime}")
                 return return_formatter(anime)
 
         elif int(anime.get('anime_season', -1)) == 0:
             if not offline:
                 anime['anime_type'] = "torrent"
-                logger.info(f"Anime with 0 season found \n{anime}")
+                logger.error(f"Anime with 0 season found \n{anime}")
                 return return_formatter(anime)
 
         if (anime["anime_title"] in anime.get("episode_title", '') or
@@ -392,7 +392,7 @@ def track(anime_filepath, is_folder=False, offline=False):
             if anime.get("anime_title", None):
                 anime = anime_check(anime, offline)
             else:
-                logger.info(f"Confused about this anime 471\n{anime}")
+                logger.error(f"Anime title not found\n{anime}")
                 return return_formatter(anime)
             # no folder detection added yet.
             # guess = anime.copy()
@@ -410,7 +410,7 @@ def track(anime_filepath, is_folder=False, offline=False):
             # if guess.get("anime_type", None) != "torrent":
             #     return guess
         if anime.get("anime_type", None) != "torrent" and anime.get("anilist", 0) == 0 and not offline:
-            logger.info(f"anime type was not torrent but the id 0 \n{anime}")
+            logger.error(f"anime type was not torrent but the id 0 \n{anime}")
             anime["anime_type"] = "torrent"
         return return_formatter(anime)
     except Exception as e:
@@ -523,7 +523,7 @@ def parsing(filename, is_folder=False) -> tuple[dict, bool]:
     # remove everything in bracket from the title, (Reconsider again)
     anime_name = re.sub(r"[(\[{].*?[)\]}]", ' ', anime['anime_title'])
     if anime_name != anime['anime_title']:
-        logger.warning(f"Removed {anime['anime_title']} from {anime_name}")
+        logger.debug(f"Removed {anime['anime_title']} from {anime_name}")
     # remove floating dashes
     anime_name = re.sub(r'[^A-Z0-9a-z][-:][^A-Z0-9a-z]', ' ', anime_name)
     anime_name = re.sub(r'\s+', ' ', anime_name).lower()
@@ -555,7 +555,7 @@ def parsing(filename, is_folder=False) -> tuple[dict, bool]:
         if unkown_type:
             logger.warning(f"Unknown anime type {unkown_type} in {original_filename}")
         if len(format_type) != 1 or len(extra_type) > 1 or unkown_type:
-            logger.warning(f"Confused about this anime 640\n{anime}")
+            logger.warning(f"multiple format type or extra type\n{anime}")
             anime["anime_type"] = "torrent"
         else:
             anime_types = format_type + extra_type
