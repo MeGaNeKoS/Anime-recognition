@@ -45,29 +45,32 @@ close_brackets = (
 escaped_bracket = "".join(re.escape(char) for char in open_brackets + close_brackets)
 
 
-def load_update():
+def load_update() -> None:
     global last_check, redirect
     # get the GitHub commit link
     for commit_type, commit_link in CONFIG["github_commit"].items():
-        commit = requests.get(commit_link)
-        relative_file_path = CONFIG["file_path"][commit_type]
-        if commit.status_code == 200:
-            try:
-                latest = commit_link.json()[0]['commit']['author']['date'].split("T")[0]
-            except Exception:
-                continue
-            # if the file is updated, download the file
-            if latest is not last_check.get(commit_type, None):
-                last_check[commit_type] = latest
-                new_anime_relation = requests.get(CONFIG["file_link"][commit_type]).content
-                os.makedirs("/".join(relative_file_path.split("/")[:-1]), exist_ok=True)
-                with open(relative_file_path, 'wb+') as outfile:
-                    outfile.write(new_anime_relation)
+        try:
+            commit = requests.get(commit_link)
+            relative_file_path = CONFIG["file_path"][commit_type]
+            if commit.status_code == 200:
+                latest = commit_link.json()[0]['commit']['author']['date']
+                # if the file is updated, download the file
+                if latest != last_check.get(commit_type, None):
+                    last_check[commit_type] = latest
+                    new_data = requests.get(CONFIG["file_link"][commit_type]).content
+                    os.makedirs("/".join(relative_file_path.split("/")[:-1]), exist_ok=True)
+                    with open(relative_file_path, 'wb+') as outfile:
+                        outfile.write(new_data)
+        except Exception:
+            pass
 
-    relation_file_path = CONFIG["file_path"]["anime_relation"]
-    # if we successfully get the commit, check if the file is updated
-    # load the localized anime relation file
-    redirect = helper.parse_anime_relations(relation_file_path, CONFIG["source_api"])
+    try:
+        relation_file_path = CONFIG["file_path"]["anime_relation"]
+        # if we successfully get the commit, check if the file is updated
+        # load the localized anime relation file
+        redirect = helper.parse_anime_relations(relation_file_path, CONFIG["source_api"])
+    except FileNotFoundError:
+        redirect = {}
 
 
 @functools.lru_cache(maxsize=CONFIG["mem_cache_size"])
@@ -285,7 +288,8 @@ def anime_check(anime: dict, offline: bool = False):
             anime["anime_year"] = result.get("endDate", {}).get("year")
     anime["anime_year"] = str(anime["anime_year"]) if anime["anime_year"] else None  # convert to string if not None
     # threat tv short as the same as tv (tv short mostly anime less than 12 minutes)
-    anime["anime_type"] = 'TV' if result.get("format", "") == 'TV_SHORT' else result.get("format", "torrent")
+    if not offline:
+        anime["anime_type"] = 'TV' if result.get("format", "") == 'TV_SHORT' else result.get("format", "torrent")
     anime["verified"] = True
     return anime
 
@@ -303,21 +307,18 @@ def track(anime_filepath, is_folder=False, offline=False):
     try:
         anime, fails = parsing(anime_filename, is_folder)
         anime["verified"] = False
-        if offline:
-            anime["verified"] = True
 
         if fails:
             logger.error(f"Failed to parse {anime_filename}")
             return return_formatter(anime)
 
         if isinstance(anime.get("anime_title", False), list):
-            logger.info(f"Multiple anime found for {anime_filename}")
-            anime["verified"] = False
+            logger.error(f"Multiple anime found for {anime_filename}")
             return return_formatter(anime)
 
         if isinstance(anime.get("episode_number", False), list):
             # probably an episode batch where it concat the same arc
-            logger.info(f"Multiple episode number found for {anime_filename} {anime['episode_number']}")
+            logger.debug(f"Multiple episode number found for {anime_filename} {anime['episode_number']}")
             anime["episode_number"] = anime["episode_number"][0]
 
         # ignore if the anime are recap episode, usually with float number
@@ -328,7 +329,7 @@ def track(anime_filepath, is_folder=False, offline=False):
                 # "ep 12.5" won't be in this block since it failed the isalnum()
                 if episode_number[-1].isdigit():
                     # it means the alphabet is in the middle of the episode number
-                    logger.info(f"Ignore {anime['anime_title']} with episode number {episode_number}\n{anime}")
+                    logger.error(f"Ignore {anime['anime_title']} with episode number {episode_number}\n{anime}")
                     return return_formatter(anime)
                 # 01A, episode 1 part 1 or A
                 eps = ""
@@ -360,7 +361,7 @@ def track(anime_filepath, is_folder=False, offline=False):
             # we could try to guess the season.
             # Usually the first are season and the second are part of the season (e.g. s2 part 1, s2 part 2)
             if len(anime.get('anime_season', [])) == 2:
-                logger.info(f"Multiple anime season found for {anime_filename}")
+                logger.debug(f"Multiple anime season found for {anime_filename}")
                 number = int(anime['anime_season'][0])
                 if number == 0:
                     anime['anime_type'] = "torrent"
@@ -368,13 +369,13 @@ def track(anime_filepath, is_folder=False, offline=False):
                     anime["anime_title"] += f" part {anime['anime_season'][1]}"
                     anime['anime_season'] = number
             else:
-                logger.info(f"Confused about this anime season\n{anime}")
+                logger.error(f"Confused about this anime season\n{anime}")
                 return return_formatter(anime)
 
         elif int(anime.get('anime_season', -1)) == 0:
             if not offline:
                 anime['anime_type'] = "torrent"
-                logger.info(f"Anime with 0 season found \n{anime}")
+                logger.error(f"Anime with 0 season found \n{anime}")
                 return return_formatter(anime)
 
         if (anime["anime_title"] in anime.get("episode_title", '') or
@@ -391,7 +392,7 @@ def track(anime_filepath, is_folder=False, offline=False):
             if anime.get("anime_title", None):
                 anime = anime_check(anime, offline)
             else:
-                logger.info(f"Confused about this anime 471\n{anime}")
+                logger.error(f"Anime title not found\n{anime}")
                 return return_formatter(anime)
             # no folder detection added yet.
             # guess = anime.copy()
@@ -409,7 +410,7 @@ def track(anime_filepath, is_folder=False, offline=False):
             # if guess.get("anime_type", None) != "torrent":
             #     return guess
         if anime.get("anime_type", None) != "torrent" and anime.get("anilist", 0) == 0 and not offline:
-            logger.info(f"anime type was not torrent but the id 0 \n{anime}")
+            logger.error(f"anime type was not torrent but the id 0 \n{anime}")
             anime["anime_type"] = "torrent"
         return return_formatter(anime)
     except Exception as e:
@@ -523,7 +524,7 @@ def parsing(filename, is_folder=False) -> tuple[dict, bool]:
     # remove everything in bracket from the title, (Reconsider again)
     anime_name = re.sub(r"[(\[{].*?[)\]}]", ' ', anime['anime_title'])
     if anime_name != anime['anime_title']:
-        logger.warning(f"Removed {anime['anime_title']} from {anime_name}")
+        logger.debug(f"Removed {anime['anime_title']} from {anime_name}")
     # remove floating dashes
     anime_name = re.sub(r'[^A-Z0-9a-z][-:][^A-Z0-9a-z]', ' ', anime_name)
     anime_name = re.sub(r'\s+', ' ', anime_name).lower()
@@ -555,7 +556,7 @@ def parsing(filename, is_folder=False) -> tuple[dict, bool]:
         if unkown_type:
             logger.warning(f"Unknown anime type {unkown_type} in {original_filename}")
         if len(format_type) != 1 or len(extra_type) > 1 or unkown_type:
-            logger.warning(f"Confused about this anime 640\n{anime}")
+            logger.warning(f"multiple format type or extra type\n{anime}")
             anime["anime_type"] = "torrent"
         else:
             anime_types = format_type + extra_type
