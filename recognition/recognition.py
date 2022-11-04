@@ -87,7 +87,7 @@ def get_anime_info_anilist(anime_id):
     if not anime_id:
         return None
     try:
-        result = instance.get.anime(anime_id, True)
+        result = instance.get.anime(anime_id, is_adult=None)
         return result["data"]["Media"]
     except Exception as e:
         logger.error(f"Error while getting anime info {anime_id}: {e}")
@@ -507,6 +507,7 @@ def parsing(filename, is_folder=False) -> tuple[dict, bool]:
     except Exception as e:
         logger.error(f"Error parsing {filename}\n{e}")
         anime = {
+            "anime_title": "",
             "anime_type": "torrent",
             "anilist": 0,
             "isFolder": is_folder,
