@@ -494,9 +494,11 @@ def parsing(filename, is_folder=False) -> tuple[dict, bool]:
 
     # remove the eps part or alt version of episode number
     # 01A, 01B, etc
-    filename = re.sub(r"(\d+)\w?\b", r"\1", filename,
+    # for now, ED/OP specified. Cant get a correct result because of the checksum
+    filename = re.sub(r"\b((?:ed|nced|endings?|op|ncop|openings?)\d{1,4})\w\b", r"\1", filename,
                       flags=re.IGNORECASE)
-    filename = re.sub(r"\b(.{0,5}\d+)(ed|nced|endings?|op|ncop|openings?)", r"\1 \2", filename,
+    # season + ED/OP specified. Cant get a correct result because of the checksum
+    filename = re.sub(r"\b(s\d+)(ed|nced|endings?|op|ncop|openings?)", r"\1 \2", filename,
                       flags=re.IGNORECASE)
 
     # remove double spaces
