@@ -325,10 +325,23 @@ def anime_check(anime: dict, offline: bool = False):
             else:
                 # after checking all the results, we still can't find the correct season
                 return anime
-
-    # looking is the anime are continuing episode or not
-    (show_id, ep) = (result['id'], int(anime.get('episode_number', 0)))
-    (anime['anilist'], anime['episode_number']) = helper.redirect_show((show_id, ep), redirect)
+    if isinstance(anime.get('episode_number', 0), list):
+        anime_ids = []
+        for idx, episode in enumerate(anime.get('episode_number', [])):
+            anime_ids.append(result["id"])
+            (show_id, ep) = (result['id'], int(episode))
+            temp = helper.redirect_show((show_id, ep), redirect)
+            (anime_ids[idx], anime['episode_number'][idx]) = temp[0], str(temp[1])
+        if len(set(anime_ids)) == 1:
+            anime['anime_id'] = anime_ids[0]
+        else:
+            logger.error('Multiple anime ids found for %s', anime)
+            return anime
+    else:
+        # looking is the anime are continuing episode or not
+        (show_id, ep) = (result['id'], int(anime.get('episode_number', 0)))
+        temp = helper.redirect_show((show_id, ep), redirect)
+        (anime['anilist'], anime['episode_number']) = temp[0], str(temp[1])
 
     # if the anime are continuing episode, then we need to get the correct season info
     if result['id'] != anime['anilist'] and not offline:
@@ -381,41 +394,76 @@ def track(anime_filepath, is_folder=False, offline=False):
         if isinstance(anime.get("episode_number", False), list):
             # probably an episode batch where it concat the same arc
             logger.debug(f"Multiple episode number found for {anime_filename} {anime['episode_number']}")
-            anime["episode_number"] = anime["episode_number"][0]
+            number = anime['episode_number']
+            for idx, episode_number in enumerate(number):
+                # ignore if the anime are recap episode, usually with float number
+                try:
+                    if episode_number.isalnum() and not episode_number.isdigit():
+                        # for episode number with part like 01A, 01B, 01C, etc
+                        # "ep 12.5" won't be in this block since it failed the isalnum()
+                        if episode_number[-1].isdigit():
+                            # it means the alphabet is in the middle of the episode number
+                            logger.error(f"Ignore {anime['anime_title']} with episode number {episode_number}\n{anime}")
+                            return return_formatter(anime)
+                        # 01A, episode 1 part 1 or A
+                        eps = ""
+                        for char in episode_number:
+                            if char.isdigit():
+                                eps += char
+                        number[idx] = eps
+                        episode_number = int(eps)
 
-        # ignore if the anime are recap episode, usually with float number
-        try:
-            episode_number = str(anime.get("episode_number", 0))
-            if episode_number.isalnum() and not episode_number.isdigit():
-                # for episode number with part like 01A, 01B, 01C, etc
-                # "ep 12.5" won't be in this block since it failed the isalnum()
-                if episode_number[-1].isdigit():
-                    # it means the alphabet is in the middle of the episode number
-                    logger.error(f"Ignore {anime['anime_title']} with episode number {episode_number}\n{anime}")
+                    try:
+                        if not float(episode_number).is_integer():
+                            return return_formatter(anime)
+                    except Exception as e:  # dev purpose, remove on release
+                        logger.error(f"Failed to parse {anime_filename} episode {episode_number} with error {e}")
+                        return return_formatter(anime)
+                except TypeError:
+                    # no folder detection yet
+                    # if not folder_path:
                     return return_formatter(anime)
-                # 01A, episode 1 part 1 or A
-                eps = ""
-                for char in episode_number:
-                    if char.isdigit():
-                        eps += char
-                anime["episode_number"] = episode_number = int(eps)
-
+                    # else:
+                    #     anime = parsing(folder_path, is_folder=True)
+                    # # multiple episodes detected, probably from concat episode, or batch eps
+                    # # we will ignore the episode
+                    # logger.info(f"{anime_filename} has multiple episodes or batch release")
+                    # anime["episode_number"] = -1
+        else:
+            # ignore if the anime are recap episode, usually with float number
             try:
-                if not float(episode_number).is_integer():
+                episode_number = str(anime.get("episode_number", 0))
+                if episode_number.isalnum() and not episode_number.isdigit():
+                    # for episode number with part like 01A, 01B, 01C, etc
+                    # "ep 12.5" won't be in this block since it failed the isalnum()
+                    if episode_number[-1].isdigit():
+                        # it means the alphabet is in the middle of the episode number
+                        logger.error(f"Ignore {anime['anime_title']} with episode number {episode_number}\n{anime}")
+                        return return_formatter(anime)
+                    # 01A, episode 1 part 1 or A
+                    eps = ""
+                    for char in episode_number:
+                        if char.isdigit():
+                            eps += char
+                    anime["episode_number"] = eps
+                    episode_number = int(eps)
+
+                try:
+                    if not float(episode_number).is_integer():
+                        return return_formatter(anime)
+                except Exception as e:  # dev purpose, remove on release
+                    logger.error(f"Failed to parse {anime_filename} episode {episode_number} with error {e}")
                     return return_formatter(anime)
-            except Exception as e:  # dev purpose, remove on release
-                logger.error(f"Failed to parse {anime_filename} episode {episode_number} with error {e}")
+            except TypeError:
+                # no folder detection yet
+                # if not folder_path:
                 return return_formatter(anime)
-        except TypeError:
-            # no folder detection yet
-            # if not folder_path:
-            return return_formatter(anime)
-            # else:
-            #     anime = parsing(folder_path, is_folder=True)
-            # # multiple episodes detected, probably from concat episode, or batch eps
-            # # we will ignore the episode
-            # logger.info(f"{anime_filename} has multiple episodes or batch release")
-            # anime["episode_number"] = -1
+                # else:
+                #     anime = parsing(folder_path, is_folder=True)
+                # # multiple episodes detected, probably from concat episode, or batch eps
+                # # we will ignore the episode
+                # logger.info(f"{anime_filename} has multiple episodes or batch release")
+                # anime["episode_number"] = -1
 
         # check if we detect multiple anime season
         if isinstance(anime.get('anime_season'), list):
