@@ -44,6 +44,62 @@ close_brackets = (
 
 escaped_bracket = "".join(re.escape(char) for char in open_brackets + close_brackets)
 
+search_anime_query = """
+query (
+  $page: Int = 1
+  $perPage: Int = 10
+  $search: String
+) {
+  Page(page: $page, perPage: $perPage) {
+    pageInfo {
+      total
+      perPage
+      currentPage
+      lastPage
+      hasNextPage
+    }
+    media(
+      search: $search
+      type: ANIME
+      season: $season
+    ) {
+      id
+      title {
+        userPreferred
+        romaji
+        english
+        native
+      }
+      startDate {
+        year
+        month
+        day
+      }
+      endDate {
+        year
+        month
+        day
+      }
+      bannerImage
+      season
+      seasonYear
+      description
+      type
+      format
+      status(version: 2)
+      episodes
+      duration
+      chapters
+      volumes
+      genres
+      isAdult
+      averageScore
+      popularity
+    }
+  }
+}
+"""
+
 
 def load_update() -> None:
     global last_check, redirect
@@ -76,7 +132,13 @@ def load_update() -> None:
 @functools.lru_cache(maxsize=CONFIG["mem_cache_size"])
 def search_anime_info_anilist(title, *args, **kwarg):
     try:
-        res = instance.search.anime(title, 1, 1000, *args, **kwarg)
+        variable = {
+            "page": 1,
+            "perPage": 1000,
+            "search": title
+        }
+
+        res = instance.search.custom_query(variable, search_anime_query, *args, **kwarg)
         if res is None:
             return []
         return res["data"]["Page"]["media"]
