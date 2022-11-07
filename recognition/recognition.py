@@ -693,9 +693,26 @@ def normalize_anime_format_type(anime, anime_type, filename):
     anime_type = anime_type.lower()
     if anime_type in CONFIG["extra_type"]:
         # remove the anime_type from the title
-        anime["anime_title"] = re.sub(r'\b' + anime_type + r'\b', '', anime["anime_title"],
-                                      flags=re.IGNORECASE).strip(" _-.&+,|")
-        # this is an extras. So, put it inside extras folder related to the anime
+        match = re.match(f'(.*)\\b{anime_type}(.*)\\b',
+                         anime["anime_title"],
+                         flags=re.IGNORECASE)
+        if match:
+            anime["anime_title"] = match.group(1).strip(" -")
+            if match.group(2).strip(" -").isnumeric():
+                anime["episode_number"] = match.group(2)
+            elif match.group(2).strip(" -").isalnum() and not match.group(2).strip(" -").isdigit():
+                eps = ""
+                for c in match.group(2).strip(" -"):
+                    if c.isdigit():
+                        eps += c
+                    else:
+                        break
+                anime["episode_number"] = eps
+            else:
+
+                # let assume it is the episode title
+                anime["episode_title"] = match.group(2).strip(" -")
+            # this is an extras. So, put it inside extras folder related to the anime
         anime["isExtras"] = True
     # normalize the anime type for special
     if anime_type in ["special", "sp"]:
