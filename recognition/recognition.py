@@ -61,7 +61,6 @@ query (
     media(
       search: $search
       type: ANIME
-      season: $season
     ) {
       id
       title {
@@ -141,6 +140,9 @@ def search_anime_info_anilist(title, *args, **kwarg):
         res = instance.search.custom_query(variable, search_anime_query, *args, **kwarg)
         if res is None:
             return []
+        if res.get("errors", None):
+            logger.error(res['errors'])
+            return []
         return res["data"]["Page"]["media"]
     except Exception as e:
         logger.error(f"Error while searching anime info {title}: {e}")
@@ -153,6 +155,9 @@ def get_anime_info_anilist(anime_id):
         return None
     try:
         result = instance.get.anime(anime_id, is_adult=None)
+        if result.get("errors", None):
+            logger.error(result['errors'])
+            return []
         return result["data"]["Media"]
     except Exception as e:
         logger.error(f"Error while getting anime info {anime_id}: {e}")
