@@ -16,7 +16,8 @@ def anime_season_relation(anime):
         with open(CONFIG['file_path']['filename_relation'], "r+", encoding="utf-8") as input_json:
             filename_relation = json.load(input_json)
         anime_id = filename_relation.get(anime.get('file_name', ""), None)
-        anime["custom_filename"] = True  # just a mark to know that we use custom filename, no real use yet.
+        if anime_id:
+            anime["custom_filename"] = True  # just a mark to know that we use custom filename, no real use yet.
 
         if anime_id is None:
             with open(CONFIG['file_path']['fansub_relation'], "r+", encoding="utf-8") as input_json:
@@ -52,6 +53,7 @@ def anime_season_relation(anime):
                         logger.debug(f"Anime id  from fansub {anime.get('release_group')} are {anime_id}")
                 else:
                     logger.debug(f"No Season {anime_season} in database")
+
     except (FileNotFoundError, ValueError, TypeError):
         pass
     return anime, anime_id
