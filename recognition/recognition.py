@@ -492,8 +492,7 @@ def track(anime_filepath, is_folder=False, offline=False):
         elif int(anime.get('anime_season', -1)) == 0:
             if not offline:
                 anime['anime_type'] = "torrent"
-                logger.error(f"Anime with 0 season found \n{anime}")
-                return return_formatter(anime)
+            logger.error(f"Anime with 0 season found \n{anime}")
 
         if (anime["anime_title"] in anime.get("episode_title", '') or
                 anime.get("episode_title", '').lower() == "end"):  # usually last eps from Erai-raws release
