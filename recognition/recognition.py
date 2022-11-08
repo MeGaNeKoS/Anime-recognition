@@ -237,7 +237,8 @@ def anime_check(anime: dict, offline: bool = False):
                     title = re.sub(r"[(\[{].*?[)\]}]|[-:]", ' ', title)
 
                     # remove any spaces in search
-                    compared_title = re.sub(r'\s+', '', title).strip(" _-.&+,|").lower()
+                    compared_title = re.sub(r"([^\w+])+", '', title)
+                    compared_title = re.sub(r'\s+', '', compared_title).strip(" _-.&+,|").lower()
 
                     ratio = SequenceMatcher(None, compared_search, compared_title).ratio()
                     if ratio > candidate[1]:
@@ -251,7 +252,8 @@ def anime_check(anime: dict, offline: bool = False):
                         synonym = re.sub(r"[(\[{].*?[)\]}]|[-:]", ' ', synonym)
 
                         # remove any spaces in search
-                        compared_synonym = re.sub(r'\s+', '', synonym).strip(" _-.&+,|").lower()
+                        compared_synonym = re.sub(r"([^\w+])+", '', synonym)
+                        compared_synonym = re.sub(r'\s+', '', compared_synonym).strip(" _-.&+,|").lower()
 
                         ratio = SequenceMatcher(None, compared_search, compared_synonym).ratio()
                         if ratio > synonyms[1]:
