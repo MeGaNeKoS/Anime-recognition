@@ -371,6 +371,7 @@ def anime_check(anime: dict, offline: bool = False):
     anime["anime_year"] = str(anime["anime_year"]) if anime["anime_year"] else None  # convert to string if not None
     # threat tv short as the same as tv (tv short mostly anime less than 12 minutes)
     if not offline:
+        anime["anime_type_filename"] = anime.get("anime_type", None)
         anime["anime_type"] = 'TV' if result.get("format", "") == 'TV_SHORT' else result.get("format", "torrent")
     anime["verified"] = True
     return anime
