@@ -41,6 +41,9 @@ def anime_season_relation(anime):
                 if anime.get("anime_year", 0):
                     anime_relation = anime_relation.get(anime.get("anime_year", "").lower(), anime_relation)
 
+                if anime.get("episode_title"):
+                    anime_relation = anime_relation.get(anime.get("episode_title", "").lower(), anime_relation)
+
                 # this can be change on code above, if we have the anime season in the anime relation
                 if anime_relation:
                     # if the anime fansub in the anime relation
