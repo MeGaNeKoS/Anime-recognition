@@ -707,9 +707,27 @@ def parsing(filename, is_folder=False) -> tuple[dict, bool]:
 
 def normalize_anime_format_type(anime, anime_type, filename):
     anime_type = anime_type.lower()
+    if anime.get("episode_title", "").lower().startswith(tuple(CONFIG["extra_type"])):
+        logger.info(f"Found extra type {anime_type} in {filename}")
+        match = re.search(r"(" + "|".join(CONFIG["extra_type"]) + ").{0,3}(\\d+)\\b", anime["episode_title"],
+                          flags=re.IGNORECASE)
+        if anime["anime_type"] == "torrent":
+            if anime.get("episode_number"):
+                anime["anime_title"] = anime["anime_title"] + " " + anime["episode_number"]
+            if match:
+                anime_type = anime["anime_type"] = match.group(1).lower()
+                anime["episode_number"] = match.group(2)
+                anime.pop("episode_title", None)
+        else:
+            if match:
+                anime_type = anime["anime_type"] = [anime["anime_type"], match.group(1).lower()]
+                anime["episode_number"] = match.group(2)
+                anime.pop("episode_title", None)
+                return anime, anime_type
+
     if anime_type in CONFIG["extra_type"]:
         # remove the anime_type from the title
-        match = re.match(f'(.*)\\b{anime_type}(.*)\\b',
+        match = re.match(f'(.*?)\\b{anime_type}(.*)\\b',
                          anime["anime_title"],
                          flags=re.IGNORECASE)
         if match:
@@ -739,7 +757,7 @@ def normalize_anime_format_type(anime, anime_type, filename):
     # normalize the anime type for ending
     elif anime_type in ['ed', 'ending', 'nced']:
         anime_type = "ending"
-        ending_number = re.match(r"ending.*(\d+)", filename)
+        ending_number = re.match(r"ending.*?(\d+)", filename)
         if ending_number:
             anime["episode_number"] = ending_number.group(1)
         if anime.get("episode_number", None) is not None:
@@ -749,7 +767,7 @@ def normalize_anime_format_type(anime, anime_type, filename):
     # normalize the anime type for opening
     elif anime_type in ['op', 'opening', 'ncop']:
         anime_type = "opening"
-        opening_number = re.match(r"opening.*(\d+)", filename)
+        opening_number = re.match(r"opening.*?(\d+)", filename)
         if opening_number:
             anime["episode_number"] = opening_number.group(1)
         if anime.get("episode_number", None) is not None:
@@ -765,8 +783,8 @@ def normalize_anime_format_type(anime, anime_type, filename):
     return anime, anime_type
 
 
-def return_formatter(anime):
+def return_formatter(anime: dict):
     if anime.get("verified", False) is False:
         anime["anime_type"] = "torrent"
     anime.pop("verified", None)
-    return anime
+    return dict(sorted(anime.items()))
