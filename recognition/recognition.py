@@ -346,17 +346,17 @@ def anime_check(anime: dict, offline: bool = False):
             anime_ids.append(result["id"])
             (show_id, ep) = (result['id'], int(episode))
             temp = helper.redirect_show((show_id, ep), redirect)
-            (anime_ids[idx], anime['episode_number'][idx]) = temp[0], str(temp[1])
+            (anime_ids[idx], anime['episode_number'][idx]) = temp[0], temp[1]
         if len(set(anime_ids)) == 1:
             anime['anilist'] = anime_ids[0]
         else:
             logger.error('Multiple anime ids found for %s', anime)
             return anime
-    else:
-        # looking is the anime are continuing episode or not
-        (show_id, ep) = (result['id'], int(anime.get('episode_number', 0)))
-        temp = helper.redirect_show((show_id, ep), redirect)
-        (anime['anilist'], anime['episode_number']) = temp[0], str(temp[1])
+    # looking is the anime are continuing episode or not
+    elif anime.get('episode_number'):
+            (show_id, ep) = (result['id'], int(anime.get('episode_number', 0)))
+            temp = helper.redirect_show((show_id, ep), redirect)
+            (anime['anilist'], anime['episode_number']) = temp[0], temp[1]
 
     if offline:
         anime["verified"] = True
