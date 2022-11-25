@@ -358,6 +358,10 @@ def anime_check(anime: dict, offline: bool = False):
         temp = helper.redirect_show((show_id, ep), redirect)
         (anime['anilist'], anime['episode_number']) = temp[0], str(temp[1])
 
+    if offline:
+        anime["verified"] = True
+        return anime
+
     # if the anime are continuing episode, then we need to get the correct season info
     if result['id'] != anime['anilist'] and not offline:
         for result in results:
@@ -536,6 +540,7 @@ def track(anime_filepath, is_folder=False, offline=False):
             #     return guess
         if anime.get("anime_type", None) != "torrent" and anime.get("anilist", 0) == 0 and not offline:
             logger.error(f"anime type was not torrent but the id 0 \n{anime}")
+            anime["anime_type_filename"] = anime["anime_type"]
             anime["anime_type"] = "torrent"
         return return_formatter(anime)
     except Exception as e:
