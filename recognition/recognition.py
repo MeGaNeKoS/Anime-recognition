@@ -5,7 +5,7 @@ import re
 from datetime import date
 from difflib import SequenceMatcher
 
-import anitopy
+import aniparse
 import devlog
 import requests
 from Anisearch import Anilist
@@ -623,7 +623,7 @@ def parsing(filename, is_folder=False) -> tuple[dict, bool]:
 
     # parse the filename
     try:
-        anime = anitopy.parse(filename)
+        anime = aniparse.parse(filename)
     except Exception as e:
         logger.error(f"Error parsing {filename}\n{e}")
         anime = {
@@ -744,29 +744,9 @@ def normalize_anime_format_type(anime, anime_type, filename):
                 anime_type = f"{anime_type} {int(eps)}"
 
     # threat movies episode as season number,
-    if anime_type in ["movie", "ova", "ona", "special"]:
-        # check for type, episode, episode_title
-        title_split = re.match(
-            r'(.*(?:movies?|ovas?|onas?|specials?))[^A-Z0-9a-z]+(?:(\d+)[^A-z0-9a-z]+)?(.*)?',
-            anime["anime_title"], flags=re.IGNORECASE)
-        if title_split:
-            # original title + type
-            anime["anime_title"] = title_split.group(1).strip(" _-.&+,|")
-            if title_split.group(2):
-                # if it is a movie, then it is season number
-                if anime_type == "movie":
-                    anime["anime_season"] = int(title_split.group(2))
-                # if not, then it is episode number
-                else:
-                    if anime.get("episode_number", None) is None:
-                        anime["episode_number"] = int(title_split.group(2))
-                    else:
-                        # episode number is already there, So log it for debugging
-                        logger.info(
-                            f"Episode number is already there, but found {title_split.group(2)} in {anime}")
-            # episode title
-            if title_split.group(3):
-                anime["episode_title"] = title_split.group(3).strip(" _-.&+,|")
+    if anime_type == "movie":
+        if anime.get("episode_number"):
+            anime["anime_season"] = anime.pop("episode_number")
 
     return anime, anime_type
 

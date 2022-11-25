@@ -39,7 +39,7 @@ def anime_season_relation(anime):
                     anime_relation = anime_relation.get(str(int(anime_season)), {})
 
                 if anime.get("anime_year", 0):
-                    anime_relation = anime_relation.get(anime.get("anime_year", "").lower(), anime_relation)
+                    anime_relation = anime_relation.get(str(anime.get("anime_year", 0)), anime_relation)
 
                 if anime.get("episode_title"):
                     anime_relation = anime_relation.get(anime.get("episode_title", "").lower(), anime_relation)
