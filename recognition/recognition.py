@@ -199,9 +199,17 @@ def anime_check(anime: dict, offline: bool = False):
             anime["verified"] = True
             return anime
 
+
+        results = search_anime_info_anilist(search)
+        if len(results) == 0:
+            if search.endswith("sp"):
+                search = search[:-2] + "special"
+                results = search_anime_info_anilist(search)
+                if len(results) == 0:
+                    search += "s"
+                    results = search_anime_info_anilist(search)
         compared_search = re.sub(r"([^\w+])+", '', search)
         compared_search = re.sub(r'\s+', '', compared_search).strip(" _-.&+,|")
-        results = search_anime_info_anilist(search)
         if len(results) == 1:
             # if the result is only one, then we can assume it is the correct anime
             candidate = (0, 1.0)  # index, score
@@ -263,7 +271,7 @@ def anime_check(anime: dict, offline: bool = False):
         # if the result is not found, then try checking the synonyms
         if candidate[1] < 0.95:
             # if the result still below 0.95 after checking synonyms, then return
-            if synonyms[1] < 0.95:
+            if synonyms[1] < 0.95 and not (anime.get("anime_season") and results):
                 anime["anime_type"] = "torrent"
                 return anime
             else:
