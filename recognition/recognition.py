@@ -678,16 +678,17 @@ def parsing(filename, is_folder=False) -> tuple[dict, bool]:
         anime, anime_type = normalize_anime_format_type(anime, anime.get("anime_type", ""), filename)
         anime["anime_type"] = anime_type
 
-    elif not is_folder and isinstance(anime.get("anime_type", None), list):
+    if not is_folder and isinstance(anime.get("anime_type", None), list):
         # make a set of the anime_type, case-insensitive
         anime_types = list(set([x.lower() for x in anime.get("anime_type", [])]))
 
-        format_type = [ft for ft in anime_types if ft in ["movie", "ova", "ona", "special", "tv"]]
-        extra_type = [et for et in anime_types if et in CONFIG["extra_type"]]
-        unkown_type = [ut for ut in anime_types if ut not in format_type + extra_type]
-        if unkown_type:
-            logger.warning(f"Unknown anime type {unkown_type} in {original_filename}")
-        if len(format_type) != 1 or len(extra_type) > 1 or unkown_type:
+        format_type = [ft for ft in anime_types if ft.lower() in ['tv', 'gekijouban', 'special', 'sp',
+                                                                  'ova', 'movie', 'special', 'ona']]
+        extra_type = [et for et in anime_types if et.lower() in CONFIG["extra_type"]]
+        unknown_type = [ut for ut in anime_types if ut.lower() not in format_type + extra_type]
+        if unknown_type:
+            logger.warning(f"Unknown anime type {unknown_type} in {original_filename}")
+        if len(format_type) != 1 or len(extra_type) > 1 or unknown_type:
             logger.warning(f"multiple format type or extra type\n{anime}")
             anime["anime_type"] = "torrent"
         else:
