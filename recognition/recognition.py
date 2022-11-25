@@ -348,7 +348,7 @@ def anime_check(anime: dict, offline: bool = False):
             temp = helper.redirect_show((show_id, ep), redirect)
             (anime_ids[idx], anime['episode_number'][idx]) = temp[0], str(temp[1])
         if len(set(anime_ids)) == 1:
-            anime['anime_id'] = anime_ids[0]
+            anime['anilist'] = anime_ids[0]
         else:
             logger.error('Multiple anime ids found for %s', anime)
             return anime
