@@ -20,7 +20,7 @@ CONFIG = {
                          "oad", "bonus cd", "menu", "pv", "scans", "bdmv"],
     "fansub_relation": 'data/anime-fansub-relation.json',
     "filename_relation": 'data/custom-filename-relations.json',
-    "extra_type": ['ending', 'ed', 'nced', 'opening', 'op', 'ncop', 'pv', 'preview'],
+    "extra_type": ['ending', 'ed', 'nced', 'clean ending', 'opening', 'op', 'ncop', 'clean opening', 'pv', 'preview'],
     "valid_ext": ['3g2', '3gp', 'aaf', 'asf', 'avchd', 'avi', 'drc', 'flv', 'm2v', 'm4p', 'm4v', 'mkv', 'mng',
                   'mov', 'mp2', 'mp4', 'mpe', 'mpeg', 'mpg', 'mpv', 'mxf', 'nsv', 'ogg', 'ogv', 'qt', 'rm',
                   'rmvb', 'roq', 'svi', 'vob', 'webm', 'wmv', 'yuv'],

@@ -45,8 +45,8 @@ test = [
     ["[Judas] Full Metal Panic S3 - Special 01.mkv", 1015],  # detected using fansub relation
     ["[ASW] Genjitsu Shugi Yuusha no Oukoku Saikenki - 14 [1080p HEVC][3E22FEDD].mkv", 139648],
     # Undetected due to a token between the season and episode
-    # ["[zza] Gundam Build Divers - S02 - Re-Rise - Part 1 - 01 [1080p.x265].mkv", 110786],
-    # ["[zza] Gundam Build Divers - S02 - Re-Rise - Part 2 - 01 [1080p.x265].mkv", 114233],
+    ["[zza] Gundam Build Divers - S02 - Re-Rise - Part 1 - 01 [1080p.x265].mkv", 110786],
+    ["[zza] Gundam Build Divers - S02 - Re-Rise - Part 2 - 01 [1080p.x265].mkv", 114233],
     ["[Judas] Honzuki no Gekokujou S1 - 01.mkv", 108268],  # detected using fansub relation
     ["[Rom & Rem] Honzuki no Gekokujou - 01 [Web][H265][10bits][1080p][AAC].mkv", 108268],
     # detected using fansub relation

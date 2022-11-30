@@ -199,7 +199,6 @@ def anime_check(anime: dict, offline: bool = False):
             anime["verified"] = True
             return anime
 
-
         results = search_anime_info_anilist(search)
         if len(results) == 0:
             if search.endswith("sp"):
@@ -271,9 +270,11 @@ def anime_check(anime: dict, offline: bool = False):
         # if the result is not found, then try checking the synonyms
         if candidate[1] < 0.95:
             # if the result still below 0.95 after checking synonyms, then return
-            if synonyms[1] < 0.95 and not (anime.get("anime_season") and results):
-                anime["anime_type"] = "torrent"
-                return anime
+            if synonyms[1] < 0.95:
+                if not (anime.get("anime_season") and results):
+                    anime["anime_type"] = "torrent"
+                    return anime
+                candidate = candidate if candidate[1] > synonyms[1] else synonyms
             else:
                 candidate = synonyms
 
@@ -287,7 +288,7 @@ def anime_check(anime: dict, offline: bool = False):
             for result in results:
                 if anime.get("anime_year", False):
                     # we have the anime year candidate
-                    if str(result.get("seasonYear")) != anime.get("anime_year", False):
+                    if result.get("seasonYear") != anime.get("anime_year", False):
                         continue
                 # attempt to retrieve from the description
                 # if the description is none, then skip it
@@ -353,10 +354,10 @@ def anime_check(anime: dict, offline: bool = False):
             logger.error('Multiple anime ids found for %s', anime)
             return anime
     # looking is the anime are continuing episode or not
-    elif anime.get('episode_number'):
-            (show_id, ep) = (result['id'], int(anime.get('episode_number', 0)))
-            temp = helper.redirect_show((show_id, ep), redirect)
-            (anime['anilist'], anime['episode_number']) = temp[0], temp[1]
+    else:
+        (show_id, ep) = (result['id'], int(anime.get('episode_number', 0)))
+        temp = helper.redirect_show((show_id, ep), redirect)
+        (anime['anilist'], anime['episode_number']) = temp[0], temp[1]
 
     if offline:
         anime["verified"] = True
@@ -380,7 +381,7 @@ def anime_check(anime: dict, offline: bool = False):
             anime["anime_year"] = result.get("startDate", {}).get("year")
         else:
             anime["anime_year"] = result.get("endDate", {}).get("year")
-    anime["anime_year"] = str(anime["anime_year"]) if anime["anime_year"] else None  # convert to string if not None
+    anime["anime_year"] = anime["anime_year"] if anime["anime_year"] else None
     # threat tv short as the same as tv (tv short mostly anime less than 12 minutes)
     if not offline:
         anime["anime_type_filename"] = anime.get("anime_type", None)
@@ -418,30 +419,12 @@ def track(anime_filepath, is_folder=False, offline=False):
             for idx, episode_number in enumerate(number):
                 # ignore if the anime are recap episode, usually with float number
                 try:
-                    if episode_number.isalnum() and not episode_number.isdigit():
-                        # for episode number with part like 01A, 01B, 01C, etc
-                        # "ep 12.5" won't be in this block since it failed the isalnum()
-                        if episode_number[-1].isdigit():
-                            # it means the alphabet is in the middle of the episode number
-                            logger.error(f"Ignore {anime['anime_title']} with episode number {episode_number}\n{anime}")
-                            return return_formatter(anime)
-                        # 01A, episode 1 part 1 or A
-                        eps = ""
-                        for char in episode_number:
-                            if char.isdigit():
-                                eps += char
-                        number[idx] = eps
-                        episode_number = int(eps)
-
-                    try:
-                        if not float(episode_number).is_integer():
-                            return return_formatter(anime)
-                    except Exception as e:  # dev purpose, remove on release
-                        logger.error(f"Failed to parse {anime_filename} episode {episode_number} with error {e}")
+                    if not float(episode_number).is_integer():
                         return return_formatter(anime)
-                except TypeError:
+                except TypeError as e:
                     # no folder detection yet
                     # if not folder_path:
+                    logger.error(f"Failed to parse {anime_filename} episode {episode_number} with error {e}")
                     return return_formatter(anime)
                     # else:
                     #     anime = parsing(folder_path, is_folder=True)
@@ -451,32 +434,14 @@ def track(anime_filepath, is_folder=False, offline=False):
                     # anime["episode_number"] = -1
         else:
             # ignore if the anime are recap episode, usually with float number
+            episode_number = anime.get("episode_number", 0)
             try:
-                episode_number = str(anime.get("episode_number", 0))
-                if episode_number.isalnum() and not episode_number.isdigit():
-                    # for episode number with part like 01A, 01B, 01C, etc
-                    # "ep 12.5" won't be in this block since it failed the isalnum()
-                    if episode_number[-1].isdigit():
-                        # it means the alphabet is in the middle of the episode number
-                        logger.error(f"Ignore {anime['anime_title']} with episode number {episode_number}\n{anime}")
-                        return return_formatter(anime)
-                    # 01A, episode 1 part 1 or A
-                    eps = ""
-                    for char in episode_number:
-                        if char.isdigit():
-                            eps += char
-                    anime["episode_number"] = eps
-                    episode_number = int(eps)
-
-                try:
-                    if not float(episode_number).is_integer():
-                        return return_formatter(anime)
-                except Exception as e:  # dev purpose, remove on release
-                    logger.error(f"Failed to parse {anime_filename} episode {episode_number} with error {e}")
+                if not float(episode_number).is_integer():
                     return return_formatter(anime)
-            except TypeError:
+            except TypeError as e:
                 # no folder detection yet
                 # if not folder_path:
+                logger.error(f"Failed to parse {anime_filename} episode {episode_number} with error {e}")
                 return return_formatter(anime)
                 # else:
                 #     anime = parsing(folder_path, is_folder=True)
@@ -496,7 +461,9 @@ def track(anime_filepath, is_folder=False, offline=False):
                 if number == 0:
                     anime['anime_type'] = "torrent"
                 else:
-                    anime["anime_title"] += f" part {anime['anime_season'][1]}"
+                    # Aniparse very unlikely to miss detect the part <number> as season.
+                    # This is most likely a multiple season stuff, e.g `S03E13 ... (S03E12 part 2)`
+                    # anime["anime_title"] += f" part {anime['anime_season'][1]}"
                     anime['anime_season'] = number
             else:
                 logger.error(f"Confused about this anime season\n{anime}")
@@ -507,12 +474,6 @@ def track(anime_filepath, is_folder=False, offline=False):
                 anime['anime_type'] = "torrent"
             logger.error(f"Anime with 0 season found \n{anime}")
 
-        if (anime["anime_title"] in anime.get("episode_title", '') or
-                anime.get("episode_title", '').lower() == "end"):  # usually last eps from Erai-raws release
-            try:
-                del anime["episode_title"]
-            except KeyError:
-                pass
 
         if (anime.get('file_extension', '') in CONFIG["valid_ext"] or
                 is_folder):
@@ -563,7 +524,7 @@ def parsing(filename, is_folder=False) -> tuple[dict, bool]:
     :param is_folder:
     :returns: {
         anime_title,
-        anime_type = str("tv" | "movie" | "ova" | "ona" | "special" | "torrent"),
+        anime_type = str("tv" | "movie" | "ova" | "ona" | "special" | "torrent" | "ending/opening [int]"),
         file_extension,
         anime_id = int(0),
         isFolder = is_folder,
@@ -573,63 +534,12 @@ def parsing(filename, is_folder=False) -> tuple[dict, bool]:
 
     """
     original_filename = filename
-    # avoid bracket typos which lead to crash
-    enter_bracket = False
-    expected_bracket = ""
-    for idx, char in enumerate(filename):
-        if char in open_brackets:
-            if enter_bracket and char != expected_bracket and expected_bracket != "":
-                # this probably a typo, change to the close bracket
-                filename = filename[:idx] + close_brackets[open_brackets.index(filename[idx])] + filename[idx + 1:]
-            enter_bracket = True
-            expected_bracket = close_brackets[open_brackets.index(char)]
-        elif char in close_brackets:
-            if char != expected_bracket and expected_bracket != "":
-                # this probably a typo, change to the correct bracket
-                filename = filename[:idx] + open_brackets[close_brackets.index(filename[idx])] + filename[idx + 1:]
-                expected_bracket = char
-            else:
-                expected_bracket = ""
-            enter_bracket = False
 
     # clean up the plural anime types in the filename
     filename = re.sub(r'\b(?:oads?|oavs?|ovas?)(?:[^A-Z0-9a-z' + escaped_bracket + r']{0,4}(\d+))?\b',
                       r'ova\1', filename, flags=re.IGNORECASE)
 
     filename = re.sub(r'\bspecials?\b', 'special', filename, flags=re.IGNORECASE)
-
-    # separate the season, type
-    filename = re.sub(r'(s\d+)[^A-Z0-9a-z' + escaped_bracket + r']{0,4}(ova|ona|tv|movie|special)', r'\1 \2', filename,
-                      flags=re.IGNORECASE)
-    # separate the season, special and episode number
-    filename = re.sub(r'(s\d+)[^A-Z0-9a-z' + escaped_bracket + r']{0,4}(sp?)(\d+)', r'\1 Special \3', filename,
-                      flags=re.IGNORECASE)
-    # separate the season, ova and episode number
-    filename = re.sub(r'(s\d+)[^A-Z0-9a-z' + escaped_bracket + r']{0,4}o(\d+)', r'\1 OVA\2', filename,
-                      flags=re.IGNORECASE)
-    # separate version if it next to the anime type
-    filename = re.sub(r"(\b(?:ed|nced|endings?|op|ncop|openings?|preview|pv))(v\d+)", r"\1 \2", filename,
-                      flags=re.IGNORECASE)
-
-    # convert ed, op to Ending and Opening
-    # separated to avoid miss detection in Takt Op. Destiny
-    filename = re.sub(r"\b(?:clean ?)?(ed|nced|endings?)(v\d+)\b", r"\1 \2", filename,
-                      flags=re.IGNORECASE)
-    filename = re.sub(r"\b(?:clean ?)?(ed|nced|endings?)\b", r"\1", filename,
-                      flags=re.IGNORECASE)
-    filename = re.sub(r"\b(?:clean ?)?(op|ncop|openings?)(v\d+)\b", r"\1 \2", filename,
-                      flags=re.IGNORECASE)
-    filename = re.sub(r"\b(?:clean ?)?(op|ncop|openings?)\b", r"\1", filename,
-                      flags=re.IGNORECASE)
-
-    # remove the eps part or alt version of episode number
-    # 01A, 01B, etc
-    # for now, ED/OP specified. Cant get a correct result because of the checksum
-    filename = re.sub(r"\b((?:ed|nced|endings?|op|ncop|openings?)\d{1,4})\w\b", r"\1", filename,
-                      flags=re.IGNORECASE)
-    # season + ED/OP specified. Cant get a correct result because of the checksum
-    filename = re.sub(r"\b(s\d+)(ed|nced|endings?|op|ncop|openings?)", r"\1 \2", filename,
-                      flags=re.IGNORECASE)
 
     # remove double spaces
     filename = re.sub(r'\s+', ' ', filename)
@@ -707,55 +617,16 @@ def parsing(filename, is_folder=False) -> tuple[dict, bool]:
 
 def normalize_anime_format_type(anime, anime_type, filename):
     anime_type = anime_type.lower()
-    if anime.get("episode_title", "").lower().startswith(tuple(CONFIG["extra_type"])):
-        logger.info(f"Found extra type {anime_type} in {filename}")
-        match = re.search(r"(" + "|".join(CONFIG["extra_type"]) + ").{0,3}(\\d+)\\b", anime["episode_title"],
-                          flags=re.IGNORECASE)
-        if anime["anime_type"] == "torrent":
-            if anime.get("episode_number"):
-                anime["anime_title"] = anime["anime_title"] + " " + anime["episode_number"]
-            if match:
-                anime_type = anime["anime_type"] = match.group(1).lower()
-                anime["episode_number"] = match.group(2)
-                anime.pop("episode_title", None)
-        else:
-            if match:
-                anime_type = anime["anime_type"] = [anime["anime_type"], match.group(1).lower()]
-                anime["episode_number"] = match.group(2)
-                anime.pop("episode_title", None)
-                return anime, anime_type
-
     if anime_type in CONFIG["extra_type"]:
-        # remove the anime_type from the title
-        match = re.match(f'(.*?)\\b{anime_type}(.*)\\b',
-                         anime["anime_title"],
-                         flags=re.IGNORECASE)
-        if match:
-            anime["anime_title"] = match.group(1).strip(" -")
-            if match.group(2).strip(" -").isnumeric():
-                anime["episode_number"] = match.group(2)
-            elif match.group(2).strip(" -").isalnum() and not match.group(2).strip(" -").isdigit():
-                eps = ""
-                for c in match.group(2).strip(" -"):
-                    if c.isdigit():
-                        eps += c
-                    else:
-                        break
-                anime["episode_number"] = eps
-            else:
-
-                # let assume it is the episode title
-                anime["episode_title"] = match.group(2).strip(" -")
-            # this is an extras. So, put it inside extras folder related to the anime
         anime["isExtras"] = True
     # normalize the anime type for special
-    if anime_type in ["special", "sp"]:
+    if anime_type in ["special", "sp", "s"]:
         anime_type = "special"
     # normalize the anime type for movie
     elif anime_type in ['gekijouban', 'movie']:
         anime_type = "movie"
     # normalize the anime type for ending
-    elif anime_type in ['ed', 'ending', 'nced']:
+    elif anime_type in ['ed', 'ending', 'nced', 'clean ending']:
         anime_type = "ending"
         ending_number = re.match(r"ending.*?(\d+)", filename)
         if ending_number:
@@ -765,7 +636,7 @@ def normalize_anime_format_type(anime, anime_type, filename):
             if eps:
                 anime_type = f"{anime_type} {int(eps)}"
     # normalize the anime type for opening
-    elif anime_type in ['op', 'opening', 'ncop']:
+    elif anime_type in ['op', 'opening', 'ncop', 'clean opening']:
         anime_type = "opening"
         opening_number = re.match(r"opening.*?(\d+)", filename)
         if opening_number:
