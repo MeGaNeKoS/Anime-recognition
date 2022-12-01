@@ -1,3 +1,4 @@
+import os
 import json
 import logging
 import re
@@ -7,21 +8,39 @@ from .config import CONFIG
 logger = logging.getLogger(__name__)
 SUPPORTED_APIS = ['mal', 'kitsu', 'anilist']
 
+_cache = {
+    "filename_relation_mTime": 0.,
+    "filename_relation": {},
+    "fansub_relation_mTime": 0.,
+    "fansub_relation": {},
+}
+
 
 def anime_season_relation(anime):
     anime_id = None
     anime_season = anime.get("anime_season", None)
 
     try:
-        with open(CONFIG['file_path']['filename_relation'], "r+", encoding="utf-8") as input_json:
-            filename_relation = json.load(input_json)
+        modified_time = os.stat(CONFIG['file_path']['filename_relation']).st_mtime
+        if modified_time != _cache['filename_relation_mTime']:
+            with open(CONFIG['file_path']['filename_relation'], "r+", encoding="utf-8") as input_json:
+                filename_relation = _cache['filename_relation'] = json.load(input_json)
+                _cache['filename_relation_mTime'] = modified_time
+        else:
+            filename_relation = _cache['filename_relation']
+
         anime_id = filename_relation.get(anime.get('file_name', ""), None)
         if anime_id:
             anime["custom_filename"] = True  # just a mark to know that we use custom filename, no real use yet.
 
         if anime_id is None:
-            with open(CONFIG['file_path']['fansub_relation'], "r+", encoding="utf-8") as input_json:
-                anime_fansub_relation = json.load(input_json)
+            modified_time = os.stat(CONFIG['file_path']['fansub_relation']).st_mtime
+            if modified_time != _cache['fansub_relation_mTime']:
+                with open(CONFIG['file_path']['fansub_relation'], "r+", encoding="utf-8") as input_json:
+                    anime_fansub_relation = json.load(input_json)
+                    _cache['fansub_relation_mTime'] = modified_time
+            else:
+                anime_fansub_relation = _cache['fansub_relation']
 
             anime_relation = anime_fansub_relation.get(anime['anime_title'], None)
             # we found in database
