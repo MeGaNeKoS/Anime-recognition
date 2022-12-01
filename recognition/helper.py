@@ -42,23 +42,36 @@ def anime_season_relation(anime):
             else:
                 anime_fansub_relation = _cache['fansub_relation']
 
+            extras = []
             anime_relation = anime_fansub_relation.get(anime['anime_title'], None)
             # we found in database
             if anime_relation:
-                # the anime season should be a string of a number without leading zero and can't be negative
                 # check for the anime type
                 if isinstance(anime.get("anime_type", None), list):
                     for anime_type in anime.get("anime_type", []):
                         if anime_type.lower() != "torrent":
+                            if anime_type.lower() in ["ending", "opening"]:
+                                extras.append(anime_type)
+                                continue
                             anime_relation = anime_relation.get(anime_type.lower(), {})
                 elif anime.get("anime_type", "torrent").lower() != "torrent":
-                    anime_relation = anime_relation.get(anime.get("anime_type", "").lower(), {})
+                    if anime.get("anime_type", "torrent").lower() in ["ending", "opening"]:
+                        extras.append(anime.get("anime_type", "torrent"))
+                    else:
+                        anime_relation = anime_relation.get(anime.get("anime_type", "").lower(), {})
 
+                # the anime season should be a string of a number without leading zero and can't be negative
                 if anime_season is not None:
                     anime_relation = anime_relation.get(str(int(anime_season)), {})
 
                 if anime.get("anime_year", 0):
                     anime_relation = anime_relation.get(str(anime.get("anime_year", 0)), anime_relation)
+
+                for extra_type in extras:
+                    anime_relation = anime_relation.get(extra_type.lower(), anime_relation)
+
+                if extras and anime.get("episode_number", None) is not None:
+                    anime_relation = anime_relation.get(str(int(anime.get("episode_number", 0))), anime_relation)
 
                 if anime.get("episode_title"):
                     anime_relation = anime_relation.get(anime.get("episode_title", "").lower(), anime_relation)

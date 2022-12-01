@@ -628,23 +628,9 @@ def normalize_anime_format_type(anime, anime_type, filename):
     # normalize the anime type for ending
     elif anime_type in ['ed', 'ending', 'nced', 'clean ending']:
         anime_type = "ending"
-        ending_number = re.match(r"ending.*?(\d+)", filename)
-        if ending_number:
-            anime["episode_number"] = ending_number.group(1)
-        if anime.get("episode_number", None) is not None:
-            eps = helper.get_number(anime["episode_number"])
-            if eps:
-                anime_type = f"{anime_type} {int(eps)}"
     # normalize the anime type for opening
     elif anime_type in ['op', 'opening', 'ncop', 'clean opening']:
         anime_type = "opening"
-        opening_number = re.match(r"opening.*?(\d+)", filename)
-        if opening_number:
-            anime["episode_number"] = opening_number.group(1)
-        if anime.get("episode_number", None) is not None:
-            eps = helper.get_number(anime["episode_number"])
-            if eps:
-                anime_type = f"{anime_type} {int(eps)}"
 
     # threat movies episode as season number,
     if anime_type == "movie":
