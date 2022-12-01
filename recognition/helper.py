@@ -36,8 +36,8 @@ def anime_season_relation(anime):
         if anime_id is None:
             modified_time = os.stat(CONFIG['file_path']['fansub_relation']).st_mtime
             if modified_time != _cache['fansub_relation_mTime']:
-                with open(CONFIG['file_path']['fansub_relation'], "r+", encoding="utf-8") as input_json:
-                    anime_fansub_relation = json.load(input_json)
+                with open(CONFIG['file_path']['fansub_relation'], "r", encoding="utf-8") as input_json:
+                    anime_fansub_relation = _cache["fansub_relation"] = json.load(input_json)
                     _cache['fansub_relation_mTime'] = modified_time
             else:
                 anime_fansub_relation = _cache['fansub_relation']
