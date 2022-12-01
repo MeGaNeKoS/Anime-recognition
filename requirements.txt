@@ -1,4 +1,4 @@
-anitopy~=2.1.0
+aniparse~=1.1.1
 requests~=2.28.0
 num2words~=0.5.10
 Anisearch~=1.1.0
